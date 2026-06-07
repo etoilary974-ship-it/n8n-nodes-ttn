@@ -1,0 +1,25 @@
+{
+	"node": "n8n-nodes-ttn",
+	"nodeVersion": "1.3",
+	"codexVersion": "1.0",
+	"categories": ["Development"],
+	"subcategories": {
+		"Development": ["The Things Network"]
+	},
+	"alias": [
+		"ttn",
+		"the things network",
+		"the things stack",
+		"lorawan",
+		"downlink",
+		"tts"
+	],
+	"resources": {
+		"credentialDocumentation": [],
+		"primaryDocumentation": [
+			{
+				"url": "https://www.thethingsindustries.com/docs/api/reference/grpc/application_server/"
+			}
+		]
+	}
+}

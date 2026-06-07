@@ -1,0 +1,29 @@
+{
+	"node": "n8n-nodes-ttn",
+	"nodeVersion": "1.9",
+	"codexVersion": "1.0",
+	"categories": ["Development"],
+	"subcategories": {
+		"Development": ["The Things Network"]
+	},
+	"alias": [
+		"ttn",
+		"receive sensor data",
+		"sensor",
+		"the things network",
+		"the things stack",
+		"lorawan",
+		"webhook",
+		"uplink",
+		"tts",
+		"trigger"
+	],
+	"resources": {
+		"credentialDocumentation": [],
+		"primaryDocumentation": [
+			{
+				"url": "https://www.thethingsindustries.com/docs/integrations/webhooks/"
+			}
+		]
+	}
+}

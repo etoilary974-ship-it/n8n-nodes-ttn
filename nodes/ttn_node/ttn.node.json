@@ -1,0 +1,29 @@
+{
+	"node": "n8n-nodes-ttn",
+	"nodeVersion": "1.7",
+	"codexVersion": "1.0",
+	"categories": ["Development"],
+	"subcategories": {
+		"Development": ["The Things Network"]
+	},
+	"alias": [
+		"ttn",
+		"the things network",
+		"the things stack",
+		"lorawan",
+		"tts",
+		"storage"
+	],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": ""
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": ""
+			}
+		]
+	}
+}
