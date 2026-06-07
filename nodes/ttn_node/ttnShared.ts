@@ -389,6 +389,34 @@ export function ttnFormatSinceLastSeen(seconds: number | null): {
 	};
 }
 
+function ttnDurationUnitWord(unit: TtnDurationUnit, value: number): string {
+	if (unit === 'minutes') {
+		return value === 1 && Number.isInteger(value) ? 'minute' : 'minutes';
+	}
+	if (unit === 'hours') {
+		return value === 1 && Number.isInteger(value) ? 'hour' : 'hours';
+	}
+	return value === 1 && Number.isInteger(value) ? 'day' : 'days';
+}
+
+/** e.g. `5.1 hours`, `3 minutes`. */
+function ttnFormatDurationLabel(seconds: number | null): string | null {
+	const formatted = ttnFormatSinceLastSeen(seconds);
+	if (!formatted) {
+		return null;
+	}
+	return `${formatted.since_last_seen} ${ttnDurationUnitWord(
+		formatted.since_last_seen_unit,
+		formatted.since_last_seen,
+	)}`;
+}
+
+/** e.g. `3 minutes ago`, `2 days ago`. */
+function ttnFormatDurationAgo(seconds: number | null): string | null {
+	const label = ttnFormatDurationLabel(seconds);
+	return label ? `${label} ago` : null;
+}
+
 /**
  * Compare `last_seen_at` (ISO 8601) to now: online if last seen within `offlineAfterMinutes`.
  */
@@ -443,10 +471,12 @@ export async function ttnExecuteGetDeviceStatus(
 		return {
 			device_id: resolvedDeviceId,
 			online: online_status === 'online',
+			last_seen: ttnFormatDurationAgo(seconds_since_last_seen),
 		};
 	}
 
 	const sinceLastSeen = ttnFormatSinceLastSeen(seconds_since_last_seen);
+	const sinceLastUplink = ttnFormatDurationSinceIso(lastSeen);
 
 	return {
 		application_id: (appIds?.application_id as string | undefined) ?? applicationId,
@@ -459,6 +489,8 @@ export async function ttnExecuteGetDeviceStatus(
 		offline_threshold_unit: offlineThresholdUnit,
 		since_last_seen: sinceLastSeen?.since_last_seen ?? null,
 		since_last_seen_unit: sinceLastSeen?.since_last_seen_unit ?? null,
+		since_last_uplink: sinceLastUplink?.duration ?? null,
+		since_last_uplink_unit: sinceLastUplink?.duration_unit ?? null,
 		source: 'device_registry',
 	};
 }
@@ -489,6 +521,37 @@ function ttnPickLastSeenAtFromGatewayConnectionStats(stats: IDataObject): string
 	return candidates.reduce((latest, cur) => (Date.parse(cur) > Date.parse(latest) ? cur : latest));
 }
 
+/** Whole minutes elapsed since an ISO timestamp (null if missing or invalid). */
+function ttnSecondsSinceIsoTimestamp(iso: string | undefined): number | null {
+	if (!iso) {
+		return null;
+	}
+	const t = Date.parse(iso);
+	if (Number.isNaN(t)) {
+		return null;
+	}
+	const seconds = Math.floor((Date.now() - t) / 1000);
+	return seconds < 0 ? 0 : seconds;
+}
+
+function ttnFormatDurationSinceIso(iso: string | undefined): {
+	duration: number;
+	duration_unit: TtnDurationUnit;
+} | null {
+	const seconds = ttnSecondsSinceIsoTimestamp(iso);
+	if (seconds === null) {
+		return null;
+	}
+	const formatted = ttnFormatSinceLastSeen(seconds);
+	if (!formatted) {
+		return null;
+	}
+	return {
+		duration: formatted.since_last_seen,
+		duration_unit: formatted.since_last_seen_unit,
+	};
+}
+
 /**
  * GET gateway connection stats (last activity monitored by Gateway Server).
  * @see https://www.thethingsindustries.com/docs/api/reference/grpc/gateway_server/
@@ -510,21 +573,31 @@ export async function ttnExecuteGetGatewayStatus(
 	);
 
 	if (statusMode === 'onlineOffline') {
+		const connectedAt = ttnPickValidIsoTimestamp(stats.connected_at);
 		return {
 			gateway_id: gatewayId,
 			online: online_status === 'online',
+			uptime: ttnFormatDurationLabel(ttnSecondsSinceIsoTimestamp(connectedAt)),
 		};
 	}
 
 	const sinceLastSeen = ttnFormatSinceLastSeen(seconds_since_last_seen);
+	const connectedAt = ttnPickValidIsoTimestamp(stats.connected_at);
+	const lastUplinkAt = ttnPickValidIsoTimestamp(stats.last_uplink_received_at);
+	const uptime = ttnFormatDurationSinceIso(connectedAt);
+	const sinceLastUplink = ttnFormatDurationSinceIso(lastUplinkAt);
 
 	return {
 		gateway_id: gatewayId,
 		last_seen_at: lastSeen ?? null,
-		last_uplink_received_at: ttnPickValidIsoTimestamp(stats.last_uplink_received_at) ?? null,
+		last_uplink_received_at: lastUplinkAt ?? null,
 		last_status_received_at: ttnPickValidIsoTimestamp(stats.last_status_received_at) ?? null,
-		connected_at: ttnPickValidIsoTimestamp(stats.connected_at) ?? null,
+		connected_at: connectedAt ?? null,
 		disconnected_at: ttnPickValidIsoTimestamp(stats.disconnected_at) ?? null,
+		uptime: uptime?.duration ?? null,
+		uptime_unit: uptime?.duration_unit ?? null,
+		since_last_uplink: sinceLastUplink?.duration ?? null,
+		since_last_uplink_unit: sinceLastUplink?.duration_unit ?? null,
 		online_status,
 		offline_threshold: Math.floor(offlineThreshold),
 		offline_threshold_unit: offlineThresholdUnit,
@@ -568,7 +641,8 @@ export function ttnPickGatewayLocation(gateway: IDataObject): IDataObject | null
 }
 
 function ttnStripGatewayLocation(gateway: IDataObject): IDataObject {
-	const { antennas: _antennas, ...rest } = gateway;
+	const rest = { ...gateway };
+	delete rest.antennas;
 	return rest;
 }
 
@@ -1112,7 +1186,7 @@ export async function ttnExecuteJsonPost(
 	if (isDownlinkPath && status === 400 && clean.type === 'invalid_argument') {
 		clean.what_to_do = [
 			clean.what_to_do,
-			'Payload: Base64 must be valid base64; use Hex for raw bytes (e.g. 3E01FE).',
+			'Payload: use Hex for raw bytes (e.g. 3E01FE) or JSON for decoded_payload.',
 		].join('\n\n');
 	}
 	throw new TtnApiError(clean);
@@ -1197,13 +1271,182 @@ export async function ttnExecuteLatestStoredUplink(
 	return records.map((payload) => ttnShapeApplicationUplinkOutput(payload, outputMode));
 }
 
+function ttnHexToBase64(hex: string): string {
+	const bytes = hex.match(/.{2}/g)?.map((pair) => parseInt(pair, 16)) ?? [];
+	if (bytes.length === 0) {
+		return '';
+	}
+	if (typeof Buffer !== 'undefined') {
+		return Buffer.from(bytes).toString('base64');
+	}
+	let binary = '';
+	for (const byte of bytes) {
+		binary += String.fromCharCode(byte);
+	}
+	return (globalThis as { btoa?: (data: string) => string }).btoa?.(binary) ?? binary;
+}
+
+function ttnValidateHexPayload(compact: string): string | null {
+	if (!compact) {
+		return 'Hex payload: value is required';
+	}
+	if (/^0x/i.test(compact)) {
+		return 'Hex payload: do not include a 0x prefix (use characters 0-9 and A-F only)';
+	}
+	if (compact.length % 2 !== 0) {
+		return 'Hex payload: character count must be even';
+	}
+	if (!/^[0-9A-F]*$/.test(compact)) {
+		return /[a-f]/.test(compact)
+			? 'Hex payload: use uppercase hex digits only (0-9 and A-F, no lowercase a-f)'
+			: 'Hex payload: only hexadecimal characters 0-9 and A-F are allowed';
+	}
+	return null;
+}
+
+function ttnValidateJsonPayload(trimmed: string): { decoded?: IDataObject; error?: string } {
+	if (!trimmed) {
+		return { decoded: {} };
+	}
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(trimmed);
+	} catch {
+		return {
+			error: 'JSON payload: invalid JSON (expected a JSON object for decoded_payload)',
+		};
+	}
+	if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+		return { error: 'JSON payload: expected a JSON object for decoded_payload' };
+	}
+	return { decoded: parsed as IDataObject };
+}
+
+export function ttnBuildSendCommandPreviewData(opts: {
+	fPort: number;
+	payloadFormat: string;
+	payloadRaw: string;
+	priority: string;
+	confirmed: boolean;
+}): { preview: IDataObject } | { error: string } {
+	const preview: IDataObject = {
+		f_port: opts.fPort,
+		priority: opts.priority,
+		confirmed: opts.confirmed,
+	};
+
+	if (opts.payloadFormat === 'hex') {
+		const compact = opts.payloadRaw.trim().replace(/\s/g, '');
+		const hexError = ttnValidateHexPayload(compact);
+		if (hexError) {
+			return { error: hexError };
+		}
+		preview.frm_payload = ttnHexToBase64(compact);
+		return { preview };
+	}
+
+	if (opts.payloadFormat === 'decodedJson') {
+		const { decoded, error } = ttnValidateJsonPayload(opts.payloadRaw.trim());
+		if (error) {
+			return { error };
+		}
+		preview.decoded_payload = decoded;
+		return { preview };
+	}
+
+	return { error: 'Payload type must be Hex or JSON (decoded_payload)' };
+}
+
+/** n8n notice expression: live Send Command preview in the node panel. */
+export function ttnSendCommandPreviewNoticeExpression(): string {
+	return `={{ (() => {
+		const preview = {
+			f_port: $parameter.fPort,
+			priority: $parameter.priority,
+			confirmed: !!$parameter.confirmed,
+		};
+		const fmt = $parameter.payloadFormat;
+		const raw = String($parameter.payload ?? '').trim();
+		const hexError = (compact) => {
+			if (!compact) return 'Hex payload: value is required';
+			if (/^0x/i.test(compact)) return 'Hex payload: do not include a 0x prefix (use characters 0-9 and A-F only)';
+			if (compact.length % 2 !== 0) return 'Hex payload: character count must be even';
+			if (!/^[0-9A-F]*$/.test(compact)) {
+				return /[a-f]/.test(compact)
+					? 'Hex payload: use uppercase hex digits only (0-9 and A-F, no lowercase a-f)'
+					: 'Hex payload: only hexadecimal characters 0-9 and A-F are allowed';
+			}
+			return null;
+		};
+		const hexToBase64 = (hex) => {
+			const bytes = hex.match(/.{2}/g).map((pair) => parseInt(pair, 16));
+			let binary = '';
+			for (const byte of bytes) binary += String.fromCharCode(byte);
+			return btoa(binary);
+		};
+		if (fmt === 'hex') {
+			const compact = raw.replace(/\\s/g, '');
+			const err = hexError(compact);
+			if (err) return '**Command preview** — ' + err;
+			preview.frm_payload = hexToBase64(compact);
+		} else if (fmt === 'decodedJson') {
+			if (!raw) {
+				preview.decoded_payload = {};
+			} else {
+				try {
+					const parsed = JSON.parse(raw);
+					if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+						return '**Command preview** — JSON payload: expected a JSON object for decoded_payload';
+					}
+					preview.decoded_payload = parsed;
+				} catch {
+					return '**Command preview** — JSON payload: invalid JSON (expected a JSON object for decoded_payload)';
+				}
+			}
+		} else {
+			return '**Command preview** — Payload type must be Hex or JSON (decoded_payload)';
+		}
+		return '**Command preview**\\n' + JSON.stringify(preview, null, 2);
+	})() }}`;
+}
+
+function ttnApplyDownlinkPayloadToItem(
+	item: IDataObject,
+	payloadFormat: string,
+	payloadRaw: string,
+	ctx: IExecuteFunctions,
+	itemIndex: number,
+): void {
+	const shaped = ttnBuildSendCommandPreviewData({
+		fPort: item.f_port as number,
+		payloadFormat,
+		payloadRaw,
+		priority: item.priority as string,
+		confirmed: item.confirmed === true,
+	});
+	if ('error' in shaped) {
+		throw new NodeOperationError(ctx.getNode(), shaped.error, { itemIndex });
+	}
+	if (shaped.preview.frm_payload !== undefined) {
+		item.frm_payload = shaped.preview.frm_payload;
+	}
+	if (shaped.preview.decoded_payload !== undefined) {
+		item.decoded_payload = shaped.preview.decoded_payload;
+	}
+}
+
 export function ttnBuildDownlinkItem(i: number, ctx: IExecuteFunctions): IDataObject {
 	const fPort = ctx.getNodeParameter('fPort', i) as number;
 	const payloadFormat = ctx.getNodeParameter('payloadFormat', i) as string;
 	const payloadRaw = ctx.getNodeParameter('payload', i) as string;
 	const priority = ctx.getNodeParameter('priority', i) as string;
 	const confirmed = ctx.getNodeParameter('confirmed', i) as boolean;
-	const correlationRaw = (ctx.getNodeParameter('correlationIdsJson', i) as string).trim();
+	let correlationRaw = '';
+	try {
+		correlationRaw = (ctx.getNodeParameter('correlationIdsJson', i) as string).trim();
+	} catch {
+		correlationRaw = '';
+	}
 
 	const item: IDataObject = {
 		f_port: fPort,
@@ -1213,41 +1456,7 @@ export function ttnBuildDownlinkItem(i: number, ctx: IExecuteFunctions): IDataOb
 		item.confirmed = true;
 	}
 
-	if (payloadFormat === 'base64') {
-		item.frm_payload = payloadRaw.trim();
-	} else if (payloadFormat === 'hex') {
-		const hex = payloadRaw.replace(/\s/g, '').replace(/^0x/i, '');
-		if (hex.length % 2 !== 0) {
-			throw new NodeOperationError(
-				ctx.getNode(),
-				'Hex payload: character count must be even',
-				{ itemIndex: i },
-			);
-		}
-		if (!/^[0-9a-fA-F]*$/.test(hex)) {
-			throw new NodeOperationError(
-				ctx.getNode(),
-				'Hex payload: non-hexadecimal characters',
-				{ itemIndex: i },
-			);
-		}
-		item.frm_payload = Buffer.from(hex, 'hex').toString('base64');
-	} else if (payloadFormat === 'decodedJson') {
-		const t = payloadRaw.trim();
-		if (!t) {
-			item.decoded_payload = {};
-		} else {
-			try {
-				item.decoded_payload = JSON.parse(t) as IDataObject;
-			} catch {
-				throw new NodeOperationError(
-					ctx.getNode(),
-					'Invalid JSON for decoded_payload',
-					{ itemIndex: i },
-				);
-			}
-		}
-	}
+	ttnApplyDownlinkPayloadToItem(item, payloadFormat, payloadRaw, ctx, i);
 
 	if (correlationRaw) {
 		try {

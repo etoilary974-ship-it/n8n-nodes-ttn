@@ -22,18 +22,17 @@ export const ttnWebhookTriggerLoadOptions = {
 /** Optional filter by application (API list) and by devices (uplink / other events with end_device_ids). */
 export const ttnWebhookDeviceFilterProperties: INodeProperties[] = [
 	{
-		displayName: 'Application (API)',
+		displayName: 'Application (API) Name or ID',
 		name: 'applicationId',
 		type: 'options',
 		typeOptions: {
 			loadOptionsMethod: 'getApplications',
 		},
 		default: '',
-		description:
-			'Loads the device list via the API. If set with a device filter, the webhook application_id must match.',
+		description: 'Loads the device list via the API. If set with a device filter, the webhook application_id must match. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 	},
 	{
-		displayName: 'Allowed devices',
+		displayName: 'Allowed Device Names or IDs',
 		name: 'ttnWebhookDeviceIds',
 		type: 'multiOptions',
 		typeOptions: {
@@ -41,8 +40,7 @@ export const ttnWebhookDeviceFilterProperties: INodeProperties[] = [
 			loadOptionsDependsOn: ['applicationId'],
 		},
 		default: [],
-		description:
-			'Leave empty: all devices. Otherwise only events whose device_id is in the list start the workflow (HTTP 200 with no run otherwise).',
+		description: 'Leave empty: all devices. Otherwise only events whose device_id is in the list start the workflow (HTTP 200 with no run otherwise). Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 	},
 ];
 
@@ -98,27 +96,27 @@ export function ttnWebhookShouldSkipForDeviceFilter(
 /** Output shape by TTN event type (triggers). */
 export const ttnWebhookOutputFormatProperties: INodeProperties[] = [
 	{
-		displayName: 'Event type',
+		displayName: 'Event Type',
 		name: 'ttnOutputEventType',
 		type: 'options',
 		noDataExpression: true,
 		options: [
-			{ name: 'Uplink message', value: 'uplink_message' },
+			{ name: 'Uplink Message', value: 'uplink_message' },
 			{
-				name: 'Normalized uplink',
+				name: 'Normalized Uplink',
 				value: 'normalized_payload',
 				description:
 					'TTS normalized payload: root `normalized_payload` or `uplink_normalized.normalized_payload`',
 			},
-			{ name: 'Join accept', value: 'join_accept' },
-			{ name: 'Downlink ack', value: 'downlink_ack' },
-			{ name: 'Downlink nack', value: 'downlink_nack' },
-			{ name: 'Downlink sent', value: 'downlink_sent' },
-			{ name: 'Downlink failed', value: 'downlink_failed' },
-			{ name: 'Downlink queued', value: 'downlink_queued' },
-			{ name: 'Downlink queue invalidated', value: 'downlink_queue_invalidated' },
-			{ name: 'Location solved', value: 'location_solved' },
-			{ name: 'Service data', value: 'service_data' },
+			{ name: 'Join Accept', value: 'join_accept' },
+			{ name: 'Downlink Ack', value: 'downlink_ack' },
+			{ name: 'Downlink Nack', value: 'downlink_nack' },
+			{ name: 'Downlink Sent', value: 'downlink_sent' },
+			{ name: 'Downlink Failed', value: 'downlink_failed' },
+			{ name: 'Downlink Queued', value: 'downlink_queued' },
+			{ name: 'Downlink Queue Invalidated', value: 'downlink_queue_invalidated' },
+			{ name: 'Location Solved', value: 'location_solved' },
+			{ name: 'Service Data', value: 'service_data' },
 			{
 				name: 'All',
 				value: 'all',
@@ -131,7 +129,7 @@ export const ttnWebhookOutputFormatProperties: INodeProperties[] = [
 			'Event you configure the output format for. If the received webhook does not match, output falls back to Full event automatically.',
 	},
 	{
-		displayName: 'Output format',
+		displayName: 'Output Format',
 		name: 'ttnOutputFormat',
 		type: 'options',
 		noDataExpression: true,
@@ -142,21 +140,21 @@ export const ttnWebhookOutputFormatProperties: INodeProperties[] = [
 		},
 		options: [
 			{
-				name: 'Sensor data',
+				name: 'Sensor Data',
 				value: 'sensorData',
-				description: 'device_id, application_id, received_at, f_port, data (decoded_payload)',
+				description: 'Device_id, application_id, received_at, f_port, data (decoded_payload)',
 			},
 			{
-				name: 'Sensor values only',
+				name: 'Sensor Values Only',
 				value: 'sensorValuesOnly',
 				description: 'Only decoded_payload fields at the root',
 			},
-			{ name: 'Full event', value: 'fullEvent', description: 'Full TTN webhook body' },
+			{ name: 'Full Event', value: 'fullEvent', description: 'Full TTN webhook body' },
 		],
 		default: 'sensorData',
 	},
 	{
-		displayName: 'Output format',
+		displayName: 'Output Format',
 		/** Distinct name from `ttnOutputFormat`: duplicate names break n8n resolution. */
 		name: 'ttnOutputFormatEvent',
 		type: 'options',
@@ -178,16 +176,16 @@ export const ttnWebhookOutputFormatProperties: INodeProperties[] = [
 		},
 		options: [
 			{
-				name: 'Event summary',
+				name: 'Event Summary',
 				value: 'eventSummary',
 				description: 'Structured summary by event type',
 			},
-			{ name: 'Full event', value: 'fullEvent', description: 'Full TTN webhook body' },
+			{ name: 'Full Event', value: 'fullEvent', description: 'Full TTN webhook body' },
 		],
 		default: 'eventSummary',
 	},
 	{
-		displayName: 'When JSON does not match event type',
+		displayName: 'When JSON Does Not Match Event Type',
 		name: 'ttnWebhookMismatchBehavior',
 		type: 'options',
 		noDataExpression: true,
@@ -198,15 +196,14 @@ export const ttnWebhookOutputFormatProperties: INodeProperties[] = [
 		},
 		options: [
 			{
-				name: 'Do not start workflow (recommended)',
+				name: 'Do Not Start Workflow (Recommended)',
 				value: 'skip',
-				description:
-					'Respond 200 without running — avoids a “ghost” run when TTS sends several messages (e.g. uplink + normalized) to the same URL.',
+				description: 'Respond 200 without running — avoids a “ghost” run when TTS sends several messages (e.g. uplink + normalized) to the same URL',
 			},
 			{
-				name: 'Run with full webhook JSON',
+				name: 'Run with Full Webhook JSON',
 				value: 'fullEvent',
-				description: 'Legacy behavior: one execution with the full body even when the type does not match.',
+				description: 'Legacy behavior: one execution with the full body even when the type does not match',
 			},
 		],
 		default: 'skip',

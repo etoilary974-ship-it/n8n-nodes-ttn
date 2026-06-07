@@ -25,7 +25,7 @@ const description: INodeTypeDescription = {
 	subtitle:
 		'={{$parameter["applicationId"] + " · " + $parameter["deviceId"]}}',
 	description:
-		'Deprecated: use the **TTN** node → **Devices** resource (Send Command, Clear Queue, Replace Queue). Kept for existing workflows.',
+		'Deprecated: use the **TTN** node → **Devices** → **Send Downlink**. Kept for existing workflows (push / replace / clear queue).',
 	defaults: {
 		name: 'TTN: Downlink',
 	},
@@ -46,7 +46,7 @@ const description: INodeTypeDescription = {
 			default: '',
 		},
 		{
-			displayName: 'Application ID',
+			displayName: 'Application Name or ID',
 			name: 'applicationId',
 			type: 'options',
 			typeOptions: {
@@ -54,11 +54,10 @@ const description: INodeTypeDescription = {
 			},
 			required: true,
 			default: '',
-			description:
-				'Listed via GET /api/v3/applications (API key rights required)',
+			description: 'Listed via GET /api/v3/applications (API key rights required). Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 		},
 		{
-			displayName: 'Device ID',
+			displayName: 'Device Name or ID',
 			name: 'deviceId',
 			type: 'options',
 			typeOptions: {
@@ -67,8 +66,7 @@ const description: INodeTypeDescription = {
 			},
 			required: true,
 			default: '',
-			description:
-				'Target device for the downlink queue (GET …/applications/{id}/devices)',
+			description: 'Target device for the downlink queue (GET …/applications/{ID}/devices). Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 		},
 		{
 			displayName: 'Operation',
@@ -77,22 +75,25 @@ const description: INodeTypeDescription = {
 			noDataExpression: true,
 			options: [
 				{
-					name: 'Enqueue (push)',
+					name: 'Enqueue (Push)',
 					value: 'push',
 					description:
 						'Append message to the queue (POST …/down/push)',
+					action: 'Append message to the queue post down push',
 				},
 				{
-					name: 'Replace queue',
+					name: 'Replace Queue',
 					value: 'replace',
 					description:
 						'Replace the whole queue with this message (POST …/down/replace)',
+					action: 'Replace the whole queue with this message post down replace',
 				},
 				{
-					name: 'Clear queue',
+					name: 'Clear Queue',
 					value: 'clear',
 					description:
 						'Sends downlinks: [] (POST …/down/replace)',
+					action: 'Sends downlinks post down replace',
 				},
 			],
 			default: 'push',
@@ -113,7 +114,7 @@ const description: INodeTypeDescription = {
 			description: 'LoRaWAN application port (1–223)',
 		},
 		{
-			displayName: 'Payload format',
+			displayName: 'Payload Type',
 			name: 'payloadFormat',
 			type: 'options',
 			noDataExpression: true,
@@ -124,24 +125,19 @@ const description: INodeTypeDescription = {
 			},
 			options: [
 				{
-					name: 'Base64 (frm_payload)',
-					value: 'base64',
-					description: 'Base64-encoded value for the API frm_payload field',
-				},
-				{
 					name: 'Hex',
 					value: 'hex',
-					description: 'Converted to binary then base64 for frm_payload',
+					description:
+						'Hex without 0x prefix; even length; uppercase 0-9 and A-F only',
 				},
 				{
-					name: 'JSON (decoded_payload)',
+					name: 'JSON (Decoded_payload)',
 					value: 'decodedJson',
-					description:
-						'JSON object (e.g. {"bytes":[1,2,3]}) encrypted on the server if a formatter is configured',
+					description: 'Valid JSON object for decoded_payload',
 				},
 			],
-			default: 'base64',
-			description: 'How the downlink message is built',
+			default: 'hex',
+			description: 'Downlink payload type (same terminology as The Things Stack)',
 		},
 		{
 			displayName: 'Payload',
@@ -156,8 +152,7 @@ const description: INodeTypeDescription = {
 					operation: ['push', 'replace'],
 				},
 			},
-			description:
-				'Base64, hex (no 0x), or JSON depending on format',
+			description: 'Hex (no 0x) or JSON object depending on payload type',
 		},
 		{
 			displayName: 'Priority',
@@ -170,17 +165,17 @@ const description: INodeTypeDescription = {
 				},
 			},
 			options: [
-				{ name: 'LOWEST', value: 'LOWEST' },
-				{ name: 'LOW', value: 'LOW' },
-				{ name: 'NORMAL', value: 'NORMAL' },
 				{ name: 'HIGH', value: 'HIGH' },
 				{ name: 'HIGHEST', value: 'HIGHEST' },
+				{ name: 'LOW', value: 'LOW' },
+				{ name: 'LOWEST', value: 'LOWEST' },
+				{ name: 'NORMAL', value: 'NORMAL' },
 			],
 			default: 'NORMAL',
 			description: 'Priority in the downlink queue',
 		},
 		{
-			displayName: 'Confirmed downlink',
+			displayName: 'Confirmed Downlink',
 			name: 'confirmed',
 			type: 'boolean',
 			default: false,
@@ -190,7 +185,7 @@ const description: INodeTypeDescription = {
 				},
 			},
 			description:
-				'If enabled, the device must acknowledge (confirmed downlink)',
+				'Whether the device must acknowledge the downlink (confirmed downlink)',
 		},
 		{
 			displayName: 'Correlation IDs (JSON)',
@@ -247,7 +242,6 @@ export class TtnDownlink implements INodeType {
 				if (this.continueOnFail()) {
 					out.push({
 						json: ttnExecutionErrorToCleanJson(error),
-						error,
 						pairedItem: { item: i },
 					});
 					continue;
@@ -264,11 +258,15 @@ export class TtnDownlink implements INodeType {
 					ttnEnrichNodeOperationErrorWithTtnContext(opErr, error.clean);
 					throw opErr;
 				}
-				throw new NodeOperationError(this.getNode(), error as Error, {
-					itemIndex: i,
-					description:
-						'HTTP response from the TTS API (see message for detail). An error here can still coincide with a “Receive downlink” event in the console.',
-				});
+				throw new NodeOperationError(
+					this.getNode(),
+					error instanceof Error ? error : new Error(String(error)),
+					{
+						itemIndex: i,
+						description:
+							'HTTP response from the TTS API (see message for detail). An error here can still coincide with a “Receive downlink” event in the console.',
+					},
+				);
 			}
 		}
 

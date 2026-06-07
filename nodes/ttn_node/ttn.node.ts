@@ -20,6 +20,7 @@ import {
 	ttnGetApplications,
 	ttnGetDevices,
 	ttnGetGateways,
+	ttnSendCommandPreviewNoticeExpression,
 	TtnApiError,
 	type TtnGatewayListScope,
 } from './ttnShared.js';
@@ -70,15 +71,37 @@ function ttnNormalizeMultiSelectIds(raw: unknown): string[] {
 	return [];
 }
 
+const ttnOperationLabels: Record<string, Record<string, string>> = {
+	data: {
+		getLastUplink: 'Data · Get Last Uplink',
+		listDevices: 'Data · List Devices',
+		getDeviceInfo: 'Data · Get Device Info',
+		getDeviceStatus: 'Data · Get Device Status',
+		listApplications: 'Data · List Applications',
+	},
+	devices: {
+		sendCommand: 'Devices · Send Downlink',
+	},
+	gateways: {
+		listGateways: 'Gateways · List Gateways',
+		getGatewayStatus: 'Gateways · Get Gateway Status',
+	},
+};
+
+function ttnNodeSubtitleExpression(): string {
+	const mapJson = JSON.stringify(ttnOperationLabels);
+	return `={{ (${mapJson})[$parameter.resource]?.[$parameter.operation] ?? $parameter.resource + " · " + $parameter.operation }}`;
+}
+
 const ttnDescription: INodeTypeDescription = {
 	displayName: 'TTN',
 	name: 'ttn',
 	icon: 'file:ttnNodeIcon.svg',
 	group: ['transform'],
 	version: 1.92,
-	subtitle: '={{$parameter["resource"] + " · " + $parameter["operation"]}}',
+	subtitle: ttnNodeSubtitleExpression(),
 	description:
-		'The Things Stack (TTN / TTS). **Data**, **Devices**, **Gateways**; **Triggers** → **Receive Sensor Data** (webhook) from the node picker.',
+		'The Things Stack (TTN / TTS). **Data**, **Devices**, **Gateways**; **Triggers** → **Webhook · Receive Events** from the node picker.',
 	defaults: {
 		name: 'TTN',
 	},
@@ -101,7 +124,7 @@ const ttnDescription: INodeTypeDescription = {
 					name: 'Data',
 					value: 'data',
 					description:
-						'Storage, device list, device details, online/offline status, applications',
+						'Storage (Get Last Uplink), device list, device details, online/offline status, applications',
 				},
 				{
 					name: 'Devices',
@@ -131,34 +154,34 @@ const ttnDescription: INodeTypeDescription = {
 				{
 					name: 'Get Last Uplink',
 					value: 'getLastUplink',
-					action: 'Get Last Uplink',
+					action: ttnOperationLabels.data.getLastUplink,
 					description:
 						'GET …/packages/storage/uplink_message — Storage required; no `limit` parameter (one n8n item per uplink received in the stream)',
 				},
 				{
 					name: 'List Devices',
 					value: 'listDevices',
-					action: 'List Devices',
+					action: ttnOperationLabels.data.listDevices,
 					description: 'GET /api/v3/applications/{application_id}/devices',
 				},
 				{
 					name: 'Get Device Info',
 					value: 'getDeviceInfo',
-					action: 'Get Device Info',
+					action: ttnOperationLabels.data.getDeviceInfo,
 					description:
 						'GET /api/v3/applications/{application_id}/devices/{device_id}',
 				},
 				{
 					name: 'Get Device Status',
 					value: 'getDeviceStatus',
-					action: 'Get Device Status',
+					action: ttnOperationLabels.data.getDeviceStatus,
 					description:
 						'Latest `last_seen_at` + online/offline status (configurable threshold, TTS registry)',
 				},
 				{
 					name: 'List Applications',
 					value: 'listApplications',
-					action: 'List Applications',
+					action: ttnOperationLabels.data.listApplications,
 					description: 'GET /api/v3/applications',
 				},
 			],
@@ -176,9 +199,9 @@ const ttnDescription: INodeTypeDescription = {
 			},
 			options: [
 				{
-					name: 'Send Command (Downlink)',
+					name: 'Send Downlink',
 					value: 'sendCommand',
-					action: 'Send Command (Downlink)',
+					action: ttnOperationLabels.devices.sendCommand,
 					description: 'POST …/down/push',
 				},
 			],
@@ -198,14 +221,13 @@ const ttnDescription: INodeTypeDescription = {
 				{
 					name: 'List Gateways',
 					value: 'listGateways',
-					action: 'List Gateways',
-					description:
-						'GET /api/v3/gateways ou …/users/{id}/gateways ou …/organizations/{id}/gateways',
+					action: ttnOperationLabels.gateways.listGateways,
+					description: 'GET /api/v3/gateways ou …/users/{ID}/gateways ou …/organizations/{id}/gateways',
 				},
 				{
 					name: 'Get Gateway Status',
 					value: 'getGatewayStatus',
-					action: 'Get Gateway Status',
+					action: ttnOperationLabels.gateways.getGatewayStatus,
 					description:
 						'GET /api/v3/gs/gateways/{gateway_id}/connection/stats — last activity and online/offline',
 				},
@@ -213,7 +235,7 @@ const ttnDescription: INodeTypeDescription = {
 			default: 'listGateways',
 		},
 		{
-			displayName: 'Gateway IDs',
+			displayName: 'Gateway ID Names or IDs',
 			name: 'gatewayStatusIds',
 			type: 'multiOptions',
 			typeOptions: {
@@ -221,8 +243,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 			required: true,
 			default: [],
-			description:
-				'One or more gateways (visible to the API key). Outputs one item per gateway.',
+			description: 'One or more gateways (visible to the API key). Outputs one item per gateway. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			displayOptions: {
 				show: {
 					resource: ['gateways'],
@@ -231,7 +252,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 		},
 		{
-			displayName: 'Status mode',
+			displayName: 'Status Mode',
 			name: 'gatewayStatusMode',
 			type: 'options',
 			noDataExpression: true,
@@ -243,21 +264,21 @@ const ttnDescription: INodeTypeDescription = {
 			},
 			options: [
 				{
-					name: 'Online / Offline',
+					name: 'Summary',
 					value: 'onlineOffline',
-					description: 'One item per gateway: `{ gateway_id, online }`',
+					description:
+						'One item per gateway: `{ gateway_id, online, uptime: "5.1 hours" }`',
 				},
 				{
 					name: 'Detailed',
 					value: 'detailed',
-					description:
-						'Full status: last_seen_at, online_status, threshold, connection stats, etc.',
+					description: 'Full status: last_seen_at, uptime, since_last_uplink (auto minutes/hours/days), online_status, etc',
 				},
 			],
 			default: 'detailed',
 		},
 		{
-			displayName: 'Offline threshold',
+			displayName: 'Offline Threshold',
 			name: 'gatewayStatusOfflineThreshold',
 			type: 'number',
 			typeOptions: { minValue: 1 },
@@ -269,11 +290,10 @@ const ttnDescription: INodeTypeDescription = {
 					operation: ['getGatewayStatus'],
 				},
 			},
-			description:
-				'If last activity is older than this window → **offline**; otherwise **online**.',
+			description: 'If last activity is older than this window → **offline**; otherwise **online**',
 		},
 		{
-			displayName: 'Offline threshold unit',
+			displayName: 'Offline Threshold Unit',
 			name: 'gatewayStatusOfflineThresholdUnit',
 			type: 'options',
 			noDataExpression: true,
@@ -292,7 +312,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 		},
 		{
-			displayName: 'List gateways — scope',
+			displayName: 'List Gateways — Scope',
 			name: 'gatewayListScope',
 			type: 'options',
 			noDataExpression: true,
@@ -304,7 +324,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 			options: [
 				{
-					name: 'All (visible to the key)',
+					name: 'All (Visible to the Key)',
 					value: 'all',
 					description: 'GET /api/v3/gateways',
 				},
@@ -322,7 +342,7 @@ const ttnDescription: INodeTypeDescription = {
 			default: 'all',
 		},
 		{
-			displayName: 'User ID (console TTS)',
+			displayName: 'User ID (Console TTS)',
 			name: 'gatewayListUserId',
 			type: 'string',
 			placeholder: 'jane-doe',
@@ -377,7 +397,7 @@ const ttnDescription: INodeTypeDescription = {
 			default: 'detailed',
 		},
 		{
-			displayName: 'Include location',
+			displayName: 'Include Location',
 			name: 'gatewayListIncludeLocation',
 			type: 'boolean',
 			default: true,
@@ -391,32 +411,7 @@ const ttnDescription: INodeTypeDescription = {
 				'When enabled, includes antenna location (`latitude`, `longitude`, `altitude`). In Summary mode, adds a `location` field when available.',
 		},
 		{
-			displayName:
-				'**Storage**: `curl -G …/packages/storage/uplink_message` with `Accept: text/event-stream` and the **Application Server** API key from credentials. Cluster URL = console host (e.g. eu1.cloud.thethings.network). **Device scope**: `…/applications/{app}/devices/{dev}/packages/storage/…`. **Lists** apps/devices use the same key.',
-			name: 'storageIntegrationNotice',
-			type: 'notice',
-			default: '',
-			displayOptions: {
-				show: {
-					resource: ['data'],
-					operation: ['getLastUplink'],
-				},
-			},
-		},
-		{
-			displayName:
-				'**Downlink**: Bearer authentication only; the API key must allow application traffic (downlinks). No webhook required.',
-			name: 'downlinkApiNotice',
-			type: 'notice',
-			default: '',
-			displayOptions: {
-				show: {
-					resource: ['devices'],
-				},
-			},
-		},
-		{
-			displayName: 'Storage scope',
+			displayName: 'Storage Scope',
 			name: 'storageScope',
 			type: 'options',
 			noDataExpression: true,
@@ -428,13 +423,13 @@ const ttnDescription: INodeTypeDescription = {
 			},
 			options: [
 				{
-					name: 'One device',
+					name: 'One Device',
 					value: 'device',
 					description:
 						'…/applications/{app}/devices/{device}/packages/storage/uplink_message',
 				},
 				{
-					name: 'Whole application',
+					name: 'Whole Application',
 					value: 'application',
 					description:
 						'…/applications/{app}/packages/storage/uplink_message',
@@ -444,7 +439,7 @@ const ttnDescription: INodeTypeDescription = {
 			description: 'Application-wide or single device',
 		},
 		{
-			displayName: '`last` window (same as TTN console)',
+			displayName: '`Last` Window (Same as TTN Console)',
 			name: 'storageLast',
 			type: 'options',
 			noDataExpression: true,
@@ -455,23 +450,23 @@ const ttnDescription: INodeTypeDescription = {
 				},
 			},
 			options: [
-				{ name: 'None (omit last)', value: '' },
-				{ name: 'Last hour', value: '1h' },
-				{ name: 'Last 3 hours', value: '3h' },
-				{ name: 'Last 6 hours', value: '6h' },
-				{ name: 'Last 12 hours', value: '12h' },
-				{ name: 'Last 24 hours', value: '24h' },
-				{ name: 'Last 2 days', value: '48h' },
-				{ name: 'Last 7 days', value: '168h' },
-				{ name: 'Last 30 days', value: '720h' },
-				{ name: 'Last 90 days', value: '2160h' },
+				{ name: 'None (Omit Last)', value: '' },
+				{ name: 'Last Hour', value: '1h' },
+				{ name: 'Last 3 Hours', value: '3h' },
+				{ name: 'Last 6 Hours', value: '6h' },
+				{ name: 'Last 12 Hours', value: '12h' },
+				{ name: 'Last 24 Hours', value: '24h' },
+				{ name: 'Last 2 Days', value: '48h' },
+				{ name: 'Last 7 Days', value: '168h' },
+				{ name: 'Last 30 Days', value: '720h' },
+				{ name: 'Last 90 Days', value: '2160h' },
 			],
 			default: '12h',
 			description:
 				'Sent to the API as `last=1h`, `last=2160h`, etc. (duration in hours + `h` suffix, same as The Things Stack).',
 		},
 		{
-			displayName: 'Application ID',
+			displayName: 'Application Name or ID',
 			name: 'applicationId',
 			type: 'options',
 			typeOptions: {
@@ -479,7 +474,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 			required: true,
 			default: '',
-			description: 'GET /api/v3/applications',
+			description: 'GET /api/v3/applications. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			displayOptions: {
 				show: {
 					resource: ['data'],
@@ -488,7 +483,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 		},
 		{
-			displayName: 'Application ID',
+			displayName: 'Application Name or ID',
 			name: 'applicationId',
 			type: 'options',
 			typeOptions: {
@@ -496,7 +491,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 			required: true,
 			default: '',
-			description: 'GET /api/v3/applications',
+			description: 'GET /api/v3/applications. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			displayOptions: {
 				show: {
 					resource: ['devices'],
@@ -504,7 +499,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 		},
 		{
-			displayName: 'Device ID (storage)',
+			displayName: 'Device ID (Storage) Name or ID',
 			name: 'storageDeviceId',
 			type: 'options',
 			typeOptions: {
@@ -513,7 +508,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 			required: true,
 			default: '',
-			description: 'Required when Storage scope is a single device',
+			description: 'Required when Storage scope is a single device. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			displayOptions: {
 				show: {
 					resource: ['data'],
@@ -523,7 +518,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 		},
 		{
-			displayName: 'Device ID',
+			displayName: 'Device Name or ID',
 			name: 'deviceId',
 			type: 'options',
 			typeOptions: {
@@ -532,7 +527,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 			required: true,
 			default: '',
-			description: 'Target device',
+			description: 'Target device. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			displayOptions: {
 				show: {
 					resource: ['data'],
@@ -541,7 +536,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 		},
 		{
-			displayName: 'Device IDs',
+			displayName: 'Device ID Names or IDs',
 			name: 'deviceStatusIds',
 			type: 'multiOptions',
 			typeOptions: {
@@ -550,7 +545,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 			required: true,
 			default: [],
-			description: 'One or more devices. Outputs one item per device.',
+			description: 'One or more devices. Outputs one item per device. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			displayOptions: {
 				show: {
 					resource: ['data'],
@@ -559,7 +554,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 		},
 		{
-			displayName: 'Status mode',
+			displayName: 'Status Mode',
 			name: 'deviceStatusMode',
 			type: 'options',
 			noDataExpression: true,
@@ -571,21 +566,21 @@ const ttnDescription: INodeTypeDescription = {
 			},
 			options: [
 				{
-					name: 'Online / Offline',
+					name: 'Summary',
 					value: 'onlineOffline',
-					description: 'One item per device: `{ device_id, online }`',
+					description:
+						'One item per device: `{ device_id, online, last_seen: "3 minutes ago" }`',
 				},
 				{
 					name: 'Detailed',
 					value: 'detailed',
-					description:
-						'Full status: last_seen_at, online_status, threshold, etc.',
+					description: 'Full status: last_seen_at, online_status, threshold, etc',
 				},
 			],
 			default: 'detailed',
 		},
 		{
-			displayName: 'Offline threshold',
+			displayName: 'Offline Threshold',
 			name: 'deviceStatusOfflineThreshold',
 			type: 'number',
 			typeOptions: { minValue: 1 },
@@ -597,11 +592,10 @@ const ttnDescription: INodeTypeDescription = {
 					operation: ['getDeviceStatus'],
 				},
 			},
-			description:
-				'If `last_seen_at` is older than this window → **offline**; otherwise **online**.',
+			description: 'If `last_seen_at` is older than this window → **offline**; otherwise **online**',
 		},
 		{
-			displayName: 'Offline threshold unit',
+			displayName: 'Offline Threshold Unit',
 			name: 'deviceStatusOfflineThresholdUnit',
 			type: 'options',
 			noDataExpression: true,
@@ -620,7 +614,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 		},
 		{
-			displayName: 'Device ID',
+			displayName: 'Device Name or ID',
 			name: 'deviceId',
 			type: 'options',
 			typeOptions: {
@@ -629,7 +623,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 			required: true,
 			default: '',
-			description: 'Target device for the downlink',
+			description: 'Target device for the downlink. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			displayOptions: {
 				show: {
 					resource: ['devices'],
@@ -637,7 +631,7 @@ const ttnDescription: INodeTypeDescription = {
 			},
 		},
 		{
-			displayName: 'Uplink output shape',
+			displayName: 'Uplink Output Shape',
 			name: 'storageOutput',
 			type: 'options',
 			noDataExpression: true,
@@ -649,20 +643,19 @@ const ttnDescription: INodeTypeDescription = {
 			},
 			options: [
 				{
-					name: 'Decoded payload + meta',
+					name: 'Decoded Payload + Meta',
 					value: 'decodedWithMeta',
-					description:
-						'decoded_payload, received_at, end_device_ids, f_port',
+					description: 'Decoded_payload, received_at, end_device_ids, f_port',
 				},
 				{
-					name: 'Decoded payload only (root)',
+					name: 'Decoded Payload only (Root)',
 					value: 'decodedOnly',
 					description: 'Formatter fields at the root',
 				},
 				{
-					name: 'Full storage record',
+					name: 'Full Storage Record',
 					value: 'full',
-					description: 'Structure brute uplink_message, frm_payload, etc.',
+					description: 'Structure brute uplink_message, frm_payload, etc',
 				},
 			],
 			default: 'full',
@@ -683,7 +676,7 @@ const ttnDescription: INodeTypeDescription = {
 			description: 'LoRaWAN application port (1–223)',
 		},
 		{
-			displayName: 'Payload format',
+			displayName: 'Payload Type',
 			name: 'payloadFormat',
 			type: 'options',
 			noDataExpression: true,
@@ -694,24 +687,19 @@ const ttnDescription: INodeTypeDescription = {
 			},
 			options: [
 				{
-					name: 'Base64 (frm_payload)',
-					value: 'base64',
-					description:
-						'Valid base64 string for frm_payload (not raw hex bytes — use Hex for e.g. 3E01FE)',
-				},
-				{
 					name: 'Hex',
 					value: 'hex',
-					description: 'Hex without 0x; converted to binary then base64 for the API',
+					description:
+						'Hex without 0x prefix; even length; uppercase 0-9 and A-F only',
 				},
 				{
-					name: 'JSON (decoded_payload)',
+					name: 'JSON (Decoded_payload)',
 					value: 'decodedJson',
-					description: 'JSON object for decoded_payload',
+					description: 'Valid JSON object for decoded_payload',
 				},
 			],
-			default: 'base64',
-			description: 'How the downlink message is built',
+			default: 'hex',
+			description: 'Downlink payload type (same terminology as The Things Stack)',
 		},
 		{
 			displayName: 'Payload',
@@ -726,7 +714,7 @@ const ttnDescription: INodeTypeDescription = {
 					resource: ['devices'],
 				},
 			},
-			description: 'Base64, hex (no 0x), or JSON depending on format',
+			description: 'Hex (no 0x) or JSON object depending on payload type',
 		},
 		{
 			displayName: 'Priority',
@@ -749,7 +737,7 @@ const ttnDescription: INodeTypeDescription = {
 			description: 'Downlink queue priority',
 		},
 		{
-			displayName: 'Confirmed downlink',
+			displayName: 'Confirmed Downlink',
 			name: 'confirmed',
 			type: 'boolean',
 			default: false,
@@ -761,19 +749,15 @@ const ttnDescription: INodeTypeDescription = {
 			description: 'Device must ACK (confirmed downlink)',
 		},
 		{
-			displayName: 'Correlation IDs (JSON)',
-			name: 'correlationIdsJson',
-			type: 'string',
-			typeOptions: {
-				rows: 2,
-			},
+			displayName: ttnSendCommandPreviewNoticeExpression(),
+			name: 'sendCommandPreview',
+			type: 'notice',
 			default: '',
 			displayOptions: {
 				show: {
 					resource: ['devices'],
 				},
 			},
-			description: 'Optional: JSON array of strings',
 		},
 	],
 };
@@ -799,7 +783,8 @@ export class Ttn implements INodeType {
 			if (
 				(norm0.resource === 'gateways' &&
 					(norm0.operation === 'listGateways' || norm0.operation === 'getGatewayStatus')) ||
-				(norm0.resource === 'data' && norm0.operation === 'getDeviceStatus')
+				(norm0.resource === 'data' &&
+					(norm0.operation === 'getDeviceStatus' || norm0.operation === 'getLastUplink'))
 			) {
 				items = [{ json: {} }];
 			}

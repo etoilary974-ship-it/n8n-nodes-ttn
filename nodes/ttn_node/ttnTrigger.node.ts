@@ -17,12 +17,12 @@ const description: INodeTypeDescription = {
 	icon: 'file:ttnNodeIcon.svg',
 	group: ['trigger'],
 	/** Include 1.9 for existing workflows (otherwise n8n shows "node not installed"). */
-	version: [1.9, 2, 2.1],
-	defaultVersion: 2.1,
+	version: [1.9, 2, 2.1, 2.2, 2.3, 2.4],
+	defaultVersion: 2.4,
 	description:
-		'**Triggers · Receive Sensor Data**: TTS webhook (real-time uplink, not Storage). Pick this entry under **TTN** → Triggers. HTTP method: POST (fixed).',
+		'TTS webhook (real-time events, not Storage). Pick under **TTN** → Triggers. HTTP method: POST (fixed).',
 	defaults: {
-		name: 'Receive Sensor Data',
+		name: 'Webhook · Receive Events',
 		ttnOutputEventType: 'uplink_message',
 		ttnOutputFormat: 'sensorData',
 		ttnOutputFormatEvent: 'eventSummary',
@@ -63,7 +63,21 @@ const description: INodeTypeDescription = {
 	],
 	properties: [
 		{
-			displayName: 'Webhook path',
+			displayName: 'Event',
+			name: 'ttnTriggerPicker',
+			type: 'hidden',
+			default: 'receiveEvents',
+			options: [
+				{
+					name: 'Receive Events',
+					value: 'receiveEvents',
+					action: 'Webhook · Receive Events',
+					description: 'TTS webhook POST (uplink and other enabled events)',
+				},
+			],
+		},
+		{
+			displayName: 'Webhook Path',
 			name: 'path',
 			type: 'string',
 			default: 'ttn-uplink',

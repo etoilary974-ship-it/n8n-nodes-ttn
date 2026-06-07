@@ -8,7 +8,8 @@
 	},
 	"alias": [
 		"ttn",
-		"receive sensor data",
+		"webhook receive events",
+		"receive events",
 		"sensor",
 		"the things network",
 		"the things stack",

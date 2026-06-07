@@ -20,17 +20,24 @@
     "url": "https://github.com/etoilary974-ship-it/TTN_Node.git"
   },
   "main": "index.js",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "build": "node ./scripts/build-package.cjs",
     "deploy": "node ./scripts/deploy.cjs",
-    "build:watch": "tsc --watch"
+    "build:watch": "tsc --watch",
+    "dev": "n8n-node dev",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "release": "n8n-node release"
   },
   "files": [
     "dist"
   ],
   "n8n": {
     "n8nNodesApiVersion": 1,
-    "strict": true,
+    "strict": false,
     "credentials": [
       "dist/credentials/ttnApi.credentials.js"
     ],
@@ -41,14 +48,15 @@
       "dist/nodes/ttn_node/ttnUplinkTrigger.node.js"
     ]
   },
-  "dependencies": {
-    "xml2js": "^0.6.2"
-  },
   "devDependencies": {
+    "@n8n/node-cli": "^0.33.1",
     "@types/node": "^20.17.0",
+    "eslint": "^9.29.0",
+    "eslint-plugin-n8n-nodes-base": "^1.16.5",
     "fast-glob": "3.2.12",
     "n8n-workflow": "^1.17.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.35.0"
   },
   "peerDependencies": {
     "n8n-workflow": "*"

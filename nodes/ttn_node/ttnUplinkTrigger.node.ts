@@ -12,7 +12,7 @@ import {
  * The unified TTN picker uses **ttnTrigger** (`ttn` + Trigger suffix).
  */
 const description: INodeTypeDescription = {
-	displayName: 'TTN Uplink Trigger (legacy)',
+	displayName: 'TTN Uplink Trigger (legacy) Trigger',
 	name: 'ttnUplinkTrigger',
 	icon: 'file:ttnNodeIcon.svg',
 	group: ['trigger'],
@@ -63,7 +63,7 @@ const description: INodeTypeDescription = {
 	],
 	properties: [
 		{
-			displayName: 'Webhook path',
+			displayName: 'Webhook Path',
 			name: 'path',
 			type: 'string',
 			default: 'ttn-uplink',
