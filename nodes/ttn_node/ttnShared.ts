@@ -1,6 +1,3 @@
-import http from 'node:http';
-import https from 'node:https';
-import type { IncomingMessage } from 'node:http';
 import { NodeOperationError } from 'n8n-workflow';
 import type {
 	ICredentialDataDecryptedObject,
@@ -35,12 +32,12 @@ export async function ttnRequestJsonForLoadOptions(
 	if (!baseUrl) {
 		throw new Error('Set the The Things Stack server URL in credentials.');
 	}
-	return (await this.helpers.httpRequest({
+	return (await this.helpers.httpRequestWithAuthentication.call(this, 'ttnApi', {
 		method: 'GET',
-		url: `${baseUrl}${relativePath}`,
+		baseURL: baseUrl,
+		url: relativePath,
 		headers: {
 			Accept: 'application/json',
-			Authorization: `Bearer ${ttnApplicationServerBearerToken(credentials)}`,
 		},
 		json: true,
 	})) as IDataObject;
@@ -197,80 +194,37 @@ function parseAllStorageUplinkRecords(body: string): IDataObject[] {
 	return out;
 }
 
-/**
- * GET Storage `text/event-stream` without `helpers.httpRequest` or `limit`: read until the server closes the stream (no node-side timeout or byte cap).
- */
-function ttnFetchStorageUplinkRawBody(urlString: string, bearerToken: string): Promise<string> {
-	return new Promise((resolve, reject) => {
-		let acc = Buffer.alloc(0);
-		let settled = false;
+async function ttnFetchStorageUplinkRawBody(
+	ctx: IExecuteFunctions,
+	baseUrl: string,
+	path: string,
+	query: IDataObject,
+): Promise<string> {
+	const res = (await ctx.helpers.httpRequestWithAuthentication.call(ctx, 'ttnApi', {
+		method: 'GET',
+		baseURL: baseUrl,
+		url: path,
+		qs: query,
+		headers: {
+			Accept: 'text/event-stream',
+		},
+		encoding: 'text',
+		returnFullResponse: true,
+		ignoreHttpStatusErrors: true,
+	})) as { statusCode?: number; body?: unknown };
 
-		const finishOk = (body: string) => {
-			if (settled) {
-				return;
-			}
-			settled = true;
-			resolve(body);
-		};
-		const finishErr = (err: Error) => {
-			if (settled) {
-				return;
-			}
-			settled = true;
-			reject(err);
-		};
+	const status = typeof res.statusCode === 'number' ? res.statusCode : 0;
+	const text =
+		typeof res.body === 'string'
+			? res.body
+			: res.body === null || res.body === undefined
+				? ''
+				: String(res.body);
 
-		let parsed: URL;
-		try {
-			parsed = new URL(urlString);
-		} catch {
-			finishErr(new Error(`Invalid Storage URL: ${urlString}`));
-			return;
-		}
-
-		const isHttps = parsed.protocol === 'https:';
-		const mod = isHttps ? https : http;
-
-		const req = mod.request(
-			{
-				hostname: parsed.hostname,
-				port: parsed.port || undefined,
-				path: `${parsed.pathname}${parsed.search}`,
-				method: 'GET',
-				headers: {
-					Authorization: `Bearer ${bearerToken}`,
-					Accept: 'text/event-stream',
-					'User-Agent': 'n8n-nodes-ttn/storage',
-				},
-			},
-			(res: IncomingMessage) => {
-				const status = res.statusCode ?? 0;
-
-				res.on('data', (chunk: Buffer) => {
-					if (settled) {
-						return;
-					}
-					acc = Buffer.concat([acc, chunk]);
-				});
-
-				res.on('end', () => {
-					if (settled) {
-						return;
-					}
-					const text = acc.toString('utf8');
-					if (status >= 200 && status < 300) {
-						finishOk(text);
-					} else {
-						finishErr(new Error(`Storage HTTP ${status} : ${text.slice(0, 900)}`));
-					}
-				});
-			},
-		);
-
-		req.on('error', finishErr);
-
-		req.end();
-	});
+	if (status >= 200 && status < 300) {
+		return text;
+	}
+	throw new Error(`Storage HTTP ${status} : ${text.slice(0, 900)}`);
 }
 
 export async function ttnExecuteJsonGet(
@@ -282,12 +236,12 @@ export async function ttnExecuteJsonGet(
 	if (!baseUrl) {
 		throw new Error('Set the The Things Stack server URL in credentials.');
 	}
-	const res = (await ctx.helpers.httpRequest({
+	const res = (await ctx.helpers.httpRequestWithAuthentication.call(ctx, 'ttnApi', {
 		method: 'GET',
-		url: `${baseUrl}${relativePath}`,
+		baseURL: baseUrl,
+		url: relativePath,
 		headers: {
 			Accept: 'application/json',
-			Authorization: `Bearer ${ttnApplicationServerBearerToken(credentials)}`,
 		},
 		json: true,
 		returnFullResponse: true,
@@ -1216,13 +1170,13 @@ export async function ttnExecuteJsonPost(
 	if (!baseUrl) {
 		throw new Error('Set the The Things Stack server URL in credentials.');
 	}
-	const res = (await ctx.helpers.httpRequest({
+	const res = (await ctx.helpers.httpRequestWithAuthentication.call(ctx, 'ttnApi', {
 		method: 'POST',
-		url: `${baseUrl}${relativePath}`,
+		baseURL: baseUrl,
+		url: relativePath,
 		headers: {
 			Accept: 'application/json',
 			'Content-Type': 'application/json',
-			Authorization: `Bearer ${credentials.apiKey}`,
 		},
 		body,
 		json: true,
@@ -1281,11 +1235,6 @@ export async function ttnExecuteLatestStoredUplink(
 	if (!baseUrl) {
 		throw new Error('Set the The Things Stack server URL in credentials.');
 	}
-	const storageToken = ttnStorageBearerToken(credentials);
-	if (!storageToken) {
-		throw new Error('Set the Application Server API key in TTN credentials.');
-	}
-
 	if (scope === 'device' && !deviceId.trim()) {
 		throw new Error(
 			'Storage (device scope): set Device ID or switch scope to the whole application.',
@@ -1298,18 +1247,15 @@ export async function ttnExecuteLatestStoredUplink(
 			: `/api/v3/as/applications/${encodeURIComponent(applicationId)}/devices/${encodeURIComponent(deviceId.trim())}/packages/storage/uplink_message`;
 
 	const fetchStorage = async (withDecodedMask: boolean): Promise<string> => {
-		const root = baseUrl.replace(/\/+$/, '');
-		const rel = path.startsWith('/') ? path : `/${path}`;
-		const u = new URL(`${root}${rel}`);
-		u.searchParams.set('order', '-received_at');
+		const query: IDataObject = { order: '-received_at' };
 		const lastTrim = last.trim();
 		if (lastTrim.length > 0) {
-			u.searchParams.set('last', lastTrim);
+			query.last = lastTrim;
 		}
 		if (withDecodedMask && outputMode !== 'full') {
-			u.searchParams.set('field_mask', 'up.uplink_message.decoded_payload,up.uplink_message.f_port');
+			query.field_mask = 'up.uplink_message.decoded_payload,up.uplink_message.f_port';
 		}
-		return ttnFetchStorageUplinkRawBody(u.toString(), storageToken);
+		return ttnFetchStorageUplinkRawBody(ctx, baseUrl, path, query);
 	};
 
 	let text = await fetchStorage(true);
@@ -1342,14 +1288,7 @@ function ttnHexToBase64(hex: string): string {
 	if (bytes.length === 0) {
 		return '';
 	}
-	if (typeof Buffer !== 'undefined') {
-		return Buffer.from(bytes).toString('base64');
-	}
-	let binary = '';
-	for (const byte of bytes) {
-		binary += String.fromCharCode(byte);
-	}
-	return (globalThis as { btoa?: (data: string) => string }).btoa?.(binary) ?? binary;
+	return Buffer.from(bytes).toString('base64');
 }
 
 function ttnValidateHexPayload(compact: string): string | null {
