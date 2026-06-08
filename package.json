@@ -1,6 +1,6 @@
 {
   "name": "@loewencreville/n8n-nodes-ttn",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "n8n community node for The Things Network (TTN)",
   "keywords": [
     "n8n-community-node-package",
