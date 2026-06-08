@@ -1,262 +1,275 @@
-![Banner image](https://user-images.githubusercontent.com/10284570/173569848-c624317f-42b1-45a6-ab09-f0ea3c247648.png)
+# n8n-nodes-ttn
 
-# n8n-nodes-starter
+Community [n8n](https://n8n.io/) nodes for [The Things Stack](https://www.thethingsindustries.com/) (TTS) — also known as **The Things Network (TTN)** on the public cloud.
 
-This starter repository helps you build custom integrations for [n8n](https://n8n.io). It includes example nodes, credentials, the node linter, and all the tooling you need to get started.
+Connect your LoRaWAN applications to n8n workflows: receive real-time uplinks via webhooks, read stored messages, send downlinks, and monitor devices and gateways through the TTS API.
 
-## Quick Start
+## Table of contents
 
-> [!TIP]
-> **New to building n8n nodes?** The fastest way to get started is with `npm create @n8n/node`. This command scaffolds a complete node package for you using the [@n8n/node-cli](https://www.npmjs.com/package/@n8n/node-cli).
+- [Installation](#installation)
+- [Credentials](#credentials)
+- [Nodes](#nodes)
+  - [TTN (main node)](#ttn-main-node)
+  - [TTN Trigger (webhook)](#ttn-trigger-webhook)
+- [Usage examples](#usage-examples)
+- [Compatibility](#compatibility)
+- [Development](#development)
+- [Resources](#resources)
+- [Version history](#version-history)
+- [License](#license)
 
-**To create a new node package from scratch:**
+## Installation
 
-```bash
-npm create @n8n/node
-```
+Follow the [n8n community nodes installation guide](https://docs.n8n.io/integrations/community-nodes/installation/).
 
-**Already using this starter? Start developing with:**
-
-```bash
-npm run dev
-```
-
-This starts n8n with your nodes loaded and hot reload enabled.
-
-## What's Included
-
-This starter repository includes two example nodes to learn from:
-
-- **[Example Node](nodes/Example/)** - A simple starter node that shows the basic structure with a custom `execute` method
-- **[GitHub Issues Node](nodes/GithubIssues/)** - A complete, production-ready example built using the **declarative style**:
-  - **Low-code approach** - Define operations declaratively without writing request logic
-  - Multiple resources (Issues, Comments)
-  - Multiple operations (Get, Get All, Create)
-  - Two authentication methods (OAuth2 and Personal Access Token)
-  - List search functionality for dynamic dropdowns
-  - Proper error handling and typing
-  - Ideal for HTTP API-based integrations
-
-> [!TIP]
-> The declarative/low-code style (used in GitHub Issues) is the recommended approach for building nodes that interact with HTTP APIs. It significantly reduces boilerplate code and handles requests automatically.
-
-Browse these examples to understand both approaches, then modify them or create your own.
-
-## Finding Inspiration
-
-Looking for more examples? Check out these resources:
-
-- **[npm Community Nodes](https://www.npmjs.com/search?q=keywords:n8n-community-node-package)** - Browse thousands of community-built nodes on npm using the `n8n-community-node-package` tag
-- **[n8n Built-in Nodes](https://github.com/n8n-io/n8n/tree/master/packages/nodes-base/nodes)** - Study the source code of n8n's official nodes for production-ready patterns and best practices
-- **[n8n Credentials](https://github.com/n8n-io/n8n/tree/master/packages/nodes-base/credentials)** - See how authentication is implemented for various services
-
-These are excellent resources to understand how to structure your nodes, handle different API patterns, and implement advanced features.
-
-## Prerequisites
-
-Before you begin, install the following on your development machine:
-
-### Required
-
-- **[Node.js](https://nodejs.org/)** (v22 or higher) and npm
-  - Linux/Mac/WSL: Install via [nvm](https://github.com/nvm-sh/nvm)
-  - Windows: Follow [Microsoft's NodeJS guide](https://learn.microsoft.com/en-us/windows/dev-environment/javascript/nodejs-on-windows)
-- **[git](https://git-scm.com/downloads)**
-
-### Recommended
-
-- Follow n8n's [development environment setup guide](https://docs.n8n.io/integrations/creating-nodes/build/node-development-environment/)
-
-> [!NOTE]
-> The `@n8n/node-cli` is included as a dev dependency and will be installed automatically when you run `npm install`. The CLI includes n8n for local development, so you don't need to install n8n globally.
-
-## Getting Started with this Starter
-
-Follow these steps to create your own n8n community node package:
-
-### 1. Create Your Repository
-
-[Generate a new repository](https://github.com/n8n-io/n8n-nodes-starter/generate) from this template, then clone it:
+**npm package:** `n8n-nodes-ttn`
 
 ```bash
-git clone https://github.com/<your-organization>/<your-repo-name>.git
-cd <your-repo-name>
+# In n8n: Settings → Community Nodes → Install → enter "n8n-nodes-ttn"
 ```
 
-### 2. Install Dependencies
+For self-hosted n8n with a custom nodes folder (Docker volume, etc.):
+
+```bash
+git clone https://github.com/etoilary974-ship-it/TTN_Node.git
+cd TTN_Node
+npm install
+npm run build
+# Copy dist/ + package.json to your n8n custom nodes directory, then restart n8n.
+# Or use: npm run deploy
+```
+
+## Credentials
+
+### The Things Stack API (`ttnApi`)
+
+| Field | Description |
+|-------|-------------|
+| **Server URL** | Base URL of your TTS deployment, **without** `/api`. Examples: `https://eu1.cloud.thethings.network`, `https://<tenant>.thethings.industries`, or your self-hosted URL. See [TTS deployments](https://www.thethingsindustries.com/docs/getting-started/cloud-hosted/). |
+| **API key (Application Server)** | An **Application Server** API key (`NNSXS…` format). Sent as `Authorization: Bearer`. Must have rights for the applications, devices, and operations you use. |
+
+**Create an API key** in the TTS console: *User settings → API keys*, or per application under *API keys*. See the official guides:
+
+- [API authentication](https://www.thethingsindustries.com/docs/reference/api/authentication/)
+- [API key rights](https://www.thethingsindustries.com/docs/reference/api/using-terraform-provider/#generate-api-key)
+
+**Required rights by operation:**
+
+| Operation | Typical API key rights |
+|-----------|------------------------|
+| List applications / devices | `applications:list`, `applications.devices:list` |
+| Get device info / status | `applications.devices:get`, `applications.devices:read` |
+| Send downlink | `applications.devices:downlink` |
+| Storage (Get Last Uplink) | Application Server key with Storage access on the target application |
+| List / status gateways | `gateways:list`, `gateways:read` (Gateway Server) |
+
+The credential test calls `GET /api/v3/applications` to verify connectivity.
+
+> **Storage vs webhooks:** [Storage](https://www.thethingsindustries.com/docs/integrations/storage/) reads historical uplinks from the TTS database. [Webhooks](https://www.thethingsindustries.com/docs/integrations/webhooks/) push events to n8n in real time. Enable Storage on your application in TTS if you use **Get Last Uplink**.
+
+## Nodes
+
+All TTN nodes share the same icon and appear grouped in the n8n node picker under **TTN**.
+
+### TTN (main node)
+
+Unified action node with three resources.
+
+#### Data
+
+| Operation | TTS API | Description |
+|-----------|---------|-------------|
+| **Get Last Uplink** | `GET …/packages/storage/uplink_message` | Reads the [Storage integration](https://www.thethingsindustries.com/docs/integrations/storage/) uplink stream (`Accept: text/event-stream`). One n8n item per uplink received. Requires Storage enabled on the application. |
+| **List Devices** | `GET /api/v3/applications/{app}/devices` | Lists devices in an application. |
+| **Get Device Info** | `GET /api/v3/applications/{app}/devices/{device}` | Full device registry object. |
+| **Get Device Status** | Registry + `last_seen_at` | Online/offline status with configurable threshold. **Summary** returns `{ device_id, online, last_seen }`; **Detailed** includes timestamps and threshold settings. |
+| **List Applications** | `GET /api/v3/applications` | Applications visible to the API key. |
+
+**Get Last Uplink options:**
+
+- **Storage scope** — single device or whole application.
+- **`Last` window** — same duration format as the TTS console (`1h`, `24h`, `168h`, …). See [Storage API](https://www.thethingsindustries.com/docs/integrations/storage/).
+- **Uplink output shape** — Decoded Payload + Meta, Decoded Payload only, or Full Storage record.
+
+#### Devices
+
+| Operation | TTS API | Description |
+|-----------|---------|-------------|
+| **Send Downlink** | `POST …/down/push` | Enqueues a downlink on the device queue. Live **command preview** in the node panel shows the exact JSON sent to TTS. |
+
+Downlink parameters match [The Things Stack downlink fields](https://www.thethingsindustries.com/docs/reference/api/application_server/#message-types):
+
+- **FPort** (1–223)
+- **Payload type** — Hex (`frm_payload`, base64-encoded by the node) or JSON (`decoded_payload`)
+- **Priority** — `LOWEST` … `HIGHEST`
+- **Confirmed downlink** — requires device ACK
+
+> To **replace** or **clear** the downlink queue, use the legacy **TTN: Downlink (deprecated)** node (hidden in the picker, still available in existing workflows).
+
+#### Gateways
+
+| Operation | TTS API | Description |
+|-----------|---------|-------------|
+| **List Gateways** | `GET /api/v3/gateways` (or per user / organization) | Scope: all gateways visible to the key, a specific user, or an organization. Optional antenna location. |
+| **Get Gateway Status** | `GET /api/v3/gs/gateways/{id}/connection/stats` | Last activity, uptime, `since_last_uplink`, online/offline (configurable threshold). |
+
+Dynamic dropdowns (applications, devices, gateways) support [n8n expressions](https://docs.n8n.io/code/expressions/) for dynamic IDs.
+
+API errors from TTS are mapped to readable messages with gRPC codes and suggested actions.
+
+---
+
+### TTN Trigger (webhook)
+
+Pick **TTN → Triggers → Webhook · Receive Events** in the node picker.
+
+Receives real-time POST webhooks from TTS — the recommended way to react to uplinks and other events. HTTP method is fixed to **POST**.
+
+#### TTS console setup
+
+1. Open your application in [TTS Console](https://console.cloud.thethings.network/).
+2. Go to **Integrations → Webhooks**.
+3. Set **Base URL** to your n8n webhook URL (test or production).
+4. Format: **JSON**. Method: **POST**.
+5. Under **Enabled event types**, check the events you need (e.g. **Uplink message**).
+
+Full guide: [TTS Webhooks integration](https://www.thethingsindustries.com/docs/integrations/webhooks/)
+
+#### Node parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| **Webhook path** | Path suffix after the n8n base URL (default: `ttn-uplink`). Must match the path configured in TTS. |
+| **Application (API)** | Optional filter: loads devices via API; webhook `application_id` must match when set. |
+| **Allowed devices** | Optional: only matching `device_id` values start the workflow (others get HTTP 200, no run). |
+| **Event type** | Uplink message, Normalized uplink, Join accept, Downlink ack/nack/sent/failed/queued, Location solved, Service data, or All. |
+| **Output format** | For uplinks: Sensor Data, Sensor Values Only, Full Event. For other events: Event Summary or Full Event. |
+| **When JSON does not match event type** | **Do not start workflow** (recommended) — avoids duplicate runs when TTS sends uplink + normalized payload to the same URL. |
+
+Credentials are optional on the trigger (only needed for the application/device filter dropdowns).
+
+> **Legacy nodes:** `TTN Uplink Trigger` and `TTN: Downlink (deprecated)` remain installed for backward compatibility but are hidden from the picker. New workflows should use **TTN** and **TTN Trigger**.
+
+## Usage examples
+
+### Real-time sensor data (webhook)
+
+```
+TTN Trigger (Webhook · Receive Events)
+  → Event type: Uplink message
+  → Output format: Sensor Data
+  → [your logic: Slack, database, etc.]
+```
+
+Output shape (`Sensor Data`):
+
+```json
+{
+  "device_id": "my-sensor",
+  "application_id": "my-app",
+  "received_at": "2026-06-07T12:00:00.000Z",
+  "f_port": 1,
+  "data": { "temperature": 22.5, "humidity": 60 }
+}
+```
+
+### Send a downlink command
+
+```
+TTN → Devices → Send Downlink
+  → Application: my-app
+  → Device: my-sensor
+  → FPort: 10
+  → Payload type: Hex
+  → Payload: 0102FF
+```
+
+See [Scheduling downlinks](https://www.thethingsindustries.com/docs/reference/api/application_server/#downlinkmessage) in the TTS docs.
+
+### Read recent uplinks from Storage
+
+```
+TTN → Data → Get Last Uplink
+  → Storage scope: One Device
+  → Last window: Last 12 Hours
+  → Uplink output shape: Decoded Payload + Meta
+```
+
+Requires [Storage integration](https://www.thethingsindustries.com/docs/integrations/storage/) enabled on the application.
+
+### Monitor device connectivity
+
+```
+TTN → Data → Get Device Status
+  → Status mode: Summary
+  → Offline threshold: 24 hours
+```
+
+### Check gateway health
+
+```
+TTN → Gateways → Get Gateway Status
+  → Gateway IDs: [your-gateway]
+  → Status mode: Detailed
+```
+
+## Compatibility
+
+| Requirement | Version |
+|-------------|---------|
+| n8n | Community nodes supported (tested with recent self-hosted releases) |
+| Node.js | ≥ 22 (development / CI) |
+| The Things Stack | v3 API (`/api/v3/…`) — public TTN cloud, Cloud Hosted, and self-hosted |
+
+No runtime npm dependencies — only `n8n-workflow` as a peer dependency.
+
+## Development
 
 ```bash
 npm install
+npm run dev      # Start n8n with hot reload
+npm run lint     # ESLint (n8n node rules)
+npm run build    # Compile to dist/
+npm run deploy   # Build + copy to custom n8n folder
+npm run release  # Version bump, changelog, tag, publish
 ```
 
-This installs all required dependencies including the `@n8n/node-cli`.
-
-### 3. Explore the Examples
-
-Browse the example nodes in [nodes/](nodes/) and [credentials/](credentials/) to understand the structure:
-
-- Start with [nodes/Example/](nodes/Example/) for a basic node
-- Study [nodes/GithubIssues/](nodes/GithubIssues/) for a real-world implementation
-
-### 4. Build Your Node
-
-Edit the example nodes to fit your use case, or create new node files by copying the structure from [nodes/Example/](nodes/Example/).
-
-> [!TIP]
-> If you want to scaffold a completely new node package, use `npm create @n8n/node` to start fresh with the CLI's interactive generator.
-
-### 5. Configure Your Package
-
-Update `package.json` with your details:
-
-- `name` - Your package name (must start with `n8n-nodes-`)
-- `author` - Your name and email
-- `repository` - Your repository URL
-- `description` - What your node does
-
-Make sure your node is registered in the `n8n.nodes` array.
-
-### 6. Develop and Test Locally
-
-Start n8n with your node loaded:
-
-```bash
-npm run dev
-```
-
-This command runs `n8n-node dev` which:
-
-- Builds your node with watch mode
-- Starts n8n with your node available
-- Automatically rebuilds when you make changes
-- Opens n8n in your browser (usually http://localhost:5678)
-
-You can now test your node in n8n workflows!
-
-> [!NOTE]
-> Learn more about CLI commands in the [@n8n/node-cli documentation](https://www.npmjs.com/package/@n8n/node-cli).
-
-### 7. Lint Your Code
-
-Check for errors:
-
-```bash
-npm run lint
-```
-
-Auto-fix issues when possible:
-
-```bash
-npm run lint:fix
-```
-
-### 8. Build for Production
-
-When ready to publish:
-
-```bash
-npm run build
-```
-
-This compiles your TypeScript code to the `dist/` folder.
-
-### 9. Prepare for Publishing
-
-Before publishing:
-
-1. **Update documentation**: Replace this README with your node's documentation. Use [README_TEMPLATE.md](README_TEMPLATE.md) as a starting point.
-2. **Update the LICENSE**: Add your details to the [LICENSE](LICENSE.md) file.
-3. **Test thoroughly**: Ensure your node works in different scenarios.
-
-### 10. Publish to npm
-
-Publishing is handled automatically by the included GitHub Actions workflow ([.github/workflows/publish.yml](.github/workflows/publish.yml)). It runs on every version tag push and publishes to npm with a provenance attestation — a requirement for n8n community nodes starting May 1, 2026.
-
-#### One-time setup
-
-Configure npm to trust this repository's GitHub Actions workflow so it can publish on your behalf. Log in to [npmjs.com](https://npmjs.com), open your package settings, and under **Publish access → Trusted Publishers** add a publisher with:
-
-- **Repository owner**: your GitHub username or org
-- **Repository name**: your repo name
-- **Workflow name**: `publish.yml`
-
-No token or secret needs to be stored in GitHub — the workflow uses GitHub's OIDC token instead.
-
-> [!NOTE]
-> If you prefer a traditional npm token, create a Granular Access Token on npmjs.com and store it as `NPM_TOKEN` in your repository's Actions secrets. See the comments at the top of `.github/workflows/publish.yml` for details.
-
-#### Releasing a new version
-
-```bash
-npm run release
-```
-
-This lints, builds, prompts for a version bump, updates the changelog, commits, tags, and pushes — which triggers the workflow to publish to npm.
-
-### 11. Submit for Verification (Optional)
-
-Get your node verified for n8n Cloud:
-
-1. Ensure your node meets the [requirements](https://docs.n8n.io/integrations/creating-nodes/deploy/submit-community-nodes/):
-   - Uses MIT license ✅ (included in this starter)
-   - No external package dependencies
-   - Follows n8n's design guidelines
-   - Passes quality and security review
-
-2. Submit through the [n8n Creator Portal](https://creators.n8n.io/nodes)
-
-**Benefits of verification:**
-
-- Available directly in n8n Cloud
-- Discoverable in the n8n nodes panel
-- Verified badge for quality assurance
-- Increased visibility in the n8n community
-
-## Available Scripts
-
-This starter includes several npm scripts to streamline development:
-
-| Script                | Description                                                                 |
-| --------------------- | --------------------------------------------------------------------------- |
-| `npm run dev`         | Start n8n with your node and watch for changes (runs `n8n-node dev`)        |
-| `npm run build`       | Compile TypeScript to JavaScript for production (runs `n8n-node build`)     |
-| `npm run build:watch` | Build in watch mode (auto-rebuild on changes)                               |
-| `npm run lint`        | Check your code for errors and style issues (runs `n8n-node lint`)          |
-| `npm run lint:fix`    | Automatically fix linting issues when possible (runs `n8n-node lint --fix`) |
-| `npm run release`     | Create a new release (runs `n8n-node release`)                              |
-
-> [!TIP]
-> These scripts use the [@n8n/node-cli](https://www.npmjs.com/package/@n8n/node-cli) under the hood. You can also run CLI commands directly, e.g., `npx n8n-node dev`.
-
-## Troubleshooting
-
-### My node doesn't appear in n8n
-
-1. Make sure you ran `npm install` to install dependencies
-2. Check that your node is listed in `package.json` under `n8n.nodes`
-3. Restart the dev server with `npm run dev`
-4. Check the console for any error messages
-
-### Linting errors
-
-Run `npm run lint:fix` to automatically fix most common issues. For remaining errors, check the [n8n node development guidelines](https://docs.n8n.io/integrations/creating-nodes/).
-
-### TypeScript errors
-
-Make sure you're using Node.js v22 or higher and have run `npm install` to get all type definitions.
+Requires Node.js 22+. See [n8n node development](https://docs.n8n.io/integrations/creating-nodes/).
 
 ## Resources
 
-- **[n8n Node Documentation](https://docs.n8n.io/integrations/creating-nodes/)** - Complete guide to building nodes
-- **[n8n Community Forum](https://community.n8n.io/)** - Get help and share your nodes
-- **[@n8n/node-cli Documentation](https://www.npmjs.com/package/@n8n/node-cli)** - CLI tool reference
-- **[n8n Creator Portal](https://creators.n8n.io/nodes)** - Submit your node for verification
-- **[Submit Community Nodes Guide](https://docs.n8n.io/integrations/creating-nodes/deploy/submit-community-nodes/)** - Verification requirements and process
+### n8n
 
-## Contributing
+- [Community nodes documentation](https://docs.n8n.io/integrations/community-nodes/)
+- [Install community nodes](https://docs.n8n.io/integrations/community-nodes/installation/)
+- [Building custom nodes](https://docs.n8n.io/integrations/creating-nodes/)
 
-Have suggestions for improving this starter? [Open an issue](https://github.com/n8n-io/n8n-nodes-starter/issues) or submit a pull request!
+### The Things Stack / TTN
+
+- [The Things Stack documentation](https://www.thethingsindustries.com/docs/)
+- [TTS Console (public cloud)](https://console.cloud.thethings.network/)
+- [API authentication](https://www.thethingsindustries.com/docs/reference/api/authentication/)
+- [Webhooks integration](https://www.thethingsindustries.com/docs/integrations/webhooks/)
+- [Storage integration](https://www.thethingsindustries.com/docs/integrations/storage/)
+- [Application Server API (devices, downlinks)](https://www.thethingsindustries.com/docs/reference/api/application_server/)
+- [Gateway Server API](https://www.thethingsindustries.com/docs/reference/api/gateway_server/)
+- [LoRaWAN concepts](https://www.thethingsindustries.com/docs/concepts/lorawan/)
+
+### This project
+
+- [GitHub repository](https://github.com/etoilary974-ship-it/TTN_Node)
+- [Changelog](CHANGELOG.md)
+- [Report an issue](https://github.com/etoilary974-ship-it/TTN_Node/issues)
+
+## Version history
+
+See [CHANGELOG.md](CHANGELOG.md) for the full release history.
+
+| Version | Highlights |
+|---------|------------|
+| **0.2.0** | Unified operation labels, downlink preview, webhook picker fix, `@n8n/node-cli`, ESLint, Node 22 |
+| **0.1.0** | Initial release: TTN node, webhook trigger, credentials, CI/CD |
 
 ## License
 
-[MIT](https://github.com/n8n-io/n8n-nodes-starter/blob/master/LICENSE.md)
+[MIT](LICENSE.md) — Copyright Loewen Creville
