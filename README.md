@@ -1,4 +1,4 @@
-# n8n-nodes-ttn
+# @loewencreville/n8n-nodes-ttn
 
 Community [n8n](https://n8n.io/) nodes for [The Things Stack](https://www.thethingsindustries.com/) (TTS) — also known as **The Things Network (TTN)** on the public cloud.
 
@@ -22,10 +22,10 @@ Connect your LoRaWAN applications to n8n workflows: receive real-time uplinks vi
 
 Follow the [n8n community nodes installation guide](https://docs.n8n.io/integrations/community-nodes/installation/).
 
-**npm package:** `n8n-nodes-ttn`
+**npm package:** [`@loewencreville/n8n-nodes-ttn`](https://www.npmjs.com/package/@loewencreville/n8n-nodes-ttn)
 
 ```bash
-# In n8n: Settings → Community Nodes → Install → enter "n8n-nodes-ttn"
+# In n8n: Settings → Community Nodes → Install → enter "@loewencreville/n8n-nodes-ttn"
 ```
 
 For self-hosted n8n with a custom nodes folder (Docker volume, etc.):
@@ -229,10 +229,12 @@ npm run dev      # Start n8n with hot reload
 npm run lint     # ESLint (n8n node rules)
 npm run build    # Compile to dist/
 npm run deploy   # Build + copy to custom n8n folder
-npm publish --access restricted  # Manual private publish to npm
+npm run release  # Lint, build, version bump, tag — triggers publish.yml on push
 ```
 
 Requires Node.js 22+. See [n8n node development](https://docs.n8n.io/integrations/creating-nodes/).
+
+**Publishing:** configure an [npm Trusted Publisher](https://docs.npmjs.com/trusted-publishers) on the package (owner `etoilary974-ship-it`, repo `TTN_Node`, workflow `publish.yml`), then run `npm run release`. The GitHub Actions workflow publishes to npm with provenance (required for n8n community verification since May 2026).
 
 ## Resources
 
@@ -255,6 +257,7 @@ Requires Node.js 22+. See [n8n node development](https://docs.n8n.io/integration
 
 ### This project
 
+- [npm package](https://www.npmjs.com/package/@loewencreville/n8n-nodes-ttn)
 - [GitHub repository](https://github.com/etoilary974-ship-it/TTN_Node)
 - [Changelog](CHANGELOG.md)
 - [Report an issue](https://github.com/etoilary974-ship-it/TTN_Node/issues)
@@ -265,8 +268,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 | Version | Highlights |
 |---------|------------|
-| **0.2.0** | Unified operation labels, downlink preview, webhook picker fix, `@n8n/node-cli`, ESLint, Node 22 |
-| **0.1.0** | Initial release: TTN node, webhook trigger, credentials, CI/CD |
+| **1.0.0** | First public release: TTN node, webhook trigger, credentials, push-only downlink, CI/CD + npm provenance |
 
 ## License
 

@@ -11,7 +11,7 @@
   ],
   "license": "MIT",
   "publishConfig": {
-    "access": "restricted"
+    "access": "public"
   },
   "homepage": "https://github.com/etoilary974-ship-it/TTN_Node",
   "author": {
@@ -40,7 +40,7 @@
   ],
   "n8n": {
     "n8nNodesApiVersion": 1,
-    "strict": false,
+    "strict": true,
     "credentials": [
       "dist/credentials/ttnApi.credentials.js"
     ],
