@@ -1,33 +1,14 @@
 # Publishes this n8n community node package to npm on every version tag push.
 #
-# Authentication uses npm Trusted Publishing (OIDC) — no NPM_TOKEN required.
-# Starting May 1 2026, n8n requires community nodes to be published via
-# GitHub Actions with npm provenance. Trusted Publishing provides both.
+# Authentication: npm Trusted Publishing (OIDC) — no NPM_TOKEN required.
+# Do NOT set registry-url on setup-node: it writes an empty _authToken line
+# that blocks OIDC. npm 11+ on Node 24 detects GitHub Actions automatically.
 #
-# ─── TRUSTED PUBLISHER (configured on npmjs.com) ─────────────────────────────
+# Trusted Publisher on npmjs.com:
+#   Owner: etoilary974-ship-it | Repo: TTN_Node | Workflow: publish.yml
 #
-# Package settings → Trusted Publishers → GitHub Actions:
-#   Repository owner: etoilary974-ship-it
-#   Repository name:  TTN_Node
-#   Workflow name:    publish.yml
-#   Environment:      (leave blank)
-#
-# ─── PREREQUISITES ─────────────────────────────────────────────────────────────
-#
-# @n8n/node-cli ≥ 0.23.0 — in CI, `npm run release` runs lint + build + publish.
-# npm CLI ≥ 11.5.1 is required for Trusted Publishing (upgraded in this workflow).
-#
-# ─── TAG CONVENTION ────────────────────────────────────────────────────────────
-#
-# Triggers on tags matching "*.*.*" (e.g. 2.0.2).
-#
-# ─── RELEASE PROCESS ───────────────────────────────────────────────────────────
-#
-# Locally:
-#   npm run release
-#
-# This bumps the version, updates the changelog, commits, tags, and pushes.
-# The tag push triggers this workflow, which publishes to npm via OIDC.
+# Release locally: npm run release  (bumps version, tags, pushes — no npm publish)
+# Tag push triggers this workflow.
 
 name: Publish
 
@@ -36,50 +17,34 @@ on:
     tags:
       - '*.*.*'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   publish:
     name: Publish to npm
     runs-on: ubuntu-latest
 
     permissions:
-      # Required for npm Trusted Publishing (OIDC token exchange).
       id-token: write
       contents: read
 
     steps:
       - uses: actions/checkout@v4
 
-      # Install without registry-url — avoids writing a dummy _authToken to .npmrc.
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-
-      - name: Upgrade npm for Trusted Publishing
-        run: npm install -g npm@latest
+          node-version: '24'
 
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      # Configure registry for scoped publish, then strip _authToken so OIDC is used.
-      - name: Configure npm registry for OIDC publish
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          registry-url: 'https://registry.npmjs.org'
-          scope: '@loewencreville'
+      - name: Lint
+        run: npm run lint
 
-      - name: Strip _authToken from .npmrc for OIDC
-        run: |
-          NPMRC_PATH="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
-          if [ -f "$NPMRC_PATH" ]; then
-            sed -i '/_authToken/d' "$NPMRC_PATH"
-          fi
-          if [ -f "$HOME/.npmrc" ] && [ "$HOME/.npmrc" != "$NPMRC_PATH" ]; then
-            sed -i '/_authToken/d' "$HOME/.npmrc"
-          fi
+      - name: Build
+        run: npm run build
 
-      - name: Release
-        # In CI, n8n-node release runs lint, build, then `npm publish` with provenance.
-        # Auth is handled automatically via GitHub OIDC (Trusted Publisher).
-        run: npm run release
+      - name: Publish to npm
+        run: npm publish --provenance --access public
