@@ -1,6 +1,6 @@
 {
-  "name": "n8n-nodes-ttn",
-  "version": "0.1.0",
+  "name": "@loewencreville/n8n-nodes-ttn",
+  "version": "0.2.0",
   "description": "n8n community node for The Things Network (TTN)",
   "keywords": [
     "n8n-community-node-package",
@@ -10,6 +10,9 @@
     "lorawan"
   ],
   "license": "MIT",
+  "publishConfig": {
+    "access": "restricted"
+  },
   "homepage": "https://github.com/etoilary974-ship-it/TTN_Node",
   "author": {
     "name": "Loewen Creville",
