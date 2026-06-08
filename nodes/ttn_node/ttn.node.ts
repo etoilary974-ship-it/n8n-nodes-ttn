@@ -222,7 +222,7 @@ const ttnDescription: INodeTypeDescription = {
 					name: 'List Gateways',
 					value: 'listGateways',
 					action: ttnOperationLabels.gateways.listGateways,
-					description: 'GET /api/v3/gateways ou …/users/{ID}/gateways ou …/organizations/{id}/gateways',
+					description: 'GET /api/v3/gateways or …/users/{ID}/gateways or …/organizations/{id}/gateways',
 				},
 				{
 					name: 'Get Gateway Status',
@@ -655,7 +655,7 @@ const ttnDescription: INodeTypeDescription = {
 				{
 					name: 'Full Storage Record',
 					value: 'full',
-					description: 'Structure brute uplink_message, frm_payload, etc',
+					description: 'Raw uplink_message structure, frm_payload, etc.',
 				},
 			],
 			default: 'full',

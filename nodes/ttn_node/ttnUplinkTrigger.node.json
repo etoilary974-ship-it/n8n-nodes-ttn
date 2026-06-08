@@ -8,6 +8,7 @@
 	},
 	"alias": [
 		"ttn",
+		"uplink trigger legacy",
 		"receive sensor data",
 		"sensor",
 		"the things network",

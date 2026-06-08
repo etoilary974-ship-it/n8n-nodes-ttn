@@ -12,7 +12,7 @@ import {
  * The unified TTN picker uses **ttnTrigger** (`ttn` + Trigger suffix).
  */
 const description: INodeTypeDescription = {
-	displayName: 'TTN Uplink Trigger (legacy) Trigger',
+	displayName: 'TTN: Uplink Trigger (legacy)',
 	name: 'ttnUplinkTrigger',
 	icon: 'file:ttnNodeIcon.svg',
 	group: ['trigger'],
@@ -20,9 +20,9 @@ const description: INodeTypeDescription = {
 	defaultVersion: 2.1,
 	hidden: true,
 	description:
-		'Deprecated: same as **TTN Trigger** / **TTN** picker → Triggers. HTTP method: POST (fixed).',
+		'Legacy: same as **TTN** picker → Triggers → **Webhook · Receive Events**. HTTP method: POST (fixed).',
 	defaults: {
-		name: 'TTN Uplink (legacy)',
+		name: 'TTN: Uplink Trigger (legacy)',
 		ttnOutputEventType: 'uplink_message',
 		ttnOutputFormat: 'sensorData',
 		ttnOutputFormatEvent: 'eventSummary',

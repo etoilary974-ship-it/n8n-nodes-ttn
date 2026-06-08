@@ -58,7 +58,7 @@ function normalizeWebhookDeviceIdFilter(raw: unknown): string[] {
 }
 
 /**
- * Filtre par device_id (et optionnellement application_id) avant mise en forme de sortie.
+ * Filter by device_id (and optionally application_id) before shaping the output.
  * @returns `true` to skip execution (same as mismatch skip).
  */
 export function ttnWebhookShouldSkipForDeviceFilter(

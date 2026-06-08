@@ -104,7 +104,7 @@ Downlink parameters match [The Things Stack downlink fields](https://www.thethin
 - **Priority** — `LOWEST` … `HIGHEST`
 - **Confirmed downlink** — requires device ACK
 
-> To **replace** or **clear** the downlink queue, use the legacy **TTN: Downlink (deprecated)** node (hidden in the picker, still available in existing workflows).
+> To **replace** or **clear** the downlink queue, use the legacy **TTN: Downlink (legacy)** node (hidden in the picker, still available in existing workflows).
 
 #### Gateways
 
@@ -148,7 +148,7 @@ Full guide: [TTS Webhooks integration](https://www.thethingsindustries.com/docs/
 
 Credentials are optional on the trigger (only needed for the application/device filter dropdowns).
 
-> **Legacy nodes:** `TTN Uplink Trigger` and `TTN: Downlink (deprecated)` remain installed for backward compatibility but are hidden from the picker. New workflows should use **TTN** and **TTN Trigger**.
+> **Legacy nodes:** `TTN: Uplink Trigger (legacy)` and `TTN: Downlink (legacy)` remain installed for backward compatibility but are hidden from the picker. New workflows should use **TTN** and **TTN Trigger**.
 
 ## Usage examples
 

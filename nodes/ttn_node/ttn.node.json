@@ -17,12 +17,12 @@
 	"resources": {
 		"credentialDocumentation": [
 			{
-				"url": ""
+				"url": "https://www.thethingsindustries.com/docs/reference/api/authentication/"
 			}
 		],
 		"primaryDocumentation": [
 			{
-				"url": ""
+				"url": "https://github.com/etoilary974-ship-it/TTN_Node#readme"
 			}
 		]
 	}

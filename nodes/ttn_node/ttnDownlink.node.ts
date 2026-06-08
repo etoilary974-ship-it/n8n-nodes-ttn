@@ -16,7 +16,7 @@ import {
 } from './ttnShared.js';
 
 const description: INodeTypeDescription = {
-	displayName: 'TTN: Downlink (deprecated)',
+	displayName: 'TTN: Downlink (legacy)',
 	name: 'ttnDownlink',
 	icon: 'file:ttnNodeIcon.svg',
 	group: ['transform'],
@@ -25,9 +25,9 @@ const description: INodeTypeDescription = {
 	subtitle:
 		'={{$parameter["applicationId"] + " · " + $parameter["deviceId"]}}',
 	description:
-		'Deprecated: use the **TTN** node → **Devices** → **Send Downlink**. Kept for existing workflows (push / replace / clear queue).',
+		'Legacy: use the **TTN** node → **Devices** → **Send Downlink**. Kept for existing workflows (push / replace / clear queue).',
 	defaults: {
-		name: 'TTN: Downlink',
+		name: 'TTN: Downlink (legacy)',
 	},
 	inputs: [NodeConnectionType.Main],
 	outputs: [NodeConnectionType.Main],
@@ -40,8 +40,8 @@ const description: INodeTypeDescription = {
 	properties: [
 		{
 			displayName:
-				'This node is hidden in the picker. Use **TTN** → **Devices** for the same operations.',
-			name: 'deprecatedNotice',
+				'This node is hidden in the picker. Use **TTN** → **Devices** → **Send Downlink** instead.',
+			name: 'legacyNotice',
 			type: 'notice',
 			default: '',
 		},

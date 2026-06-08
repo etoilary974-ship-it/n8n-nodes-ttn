@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Updated package metadata (`author`, `homepage`) in `package.json`.
+- Harmonized legacy node display names: `TTN: Downlink (legacy)`, `TTN: Uplink Trigger (legacy)`.
+- Translated remaining French comments and UI strings to English.
+- Filled documentation URLs in `ttn.node.json`.
 
 ## [0.2.0] - 2026-06-07
 

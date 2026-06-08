@@ -8,6 +8,7 @@
 	},
 	"alias": [
 		"ttn",
+		"downlink legacy",
 		"the things network",
 		"the things stack",
 		"lorawan",
