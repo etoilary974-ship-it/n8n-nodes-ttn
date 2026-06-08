@@ -229,7 +229,7 @@ npm run dev      # Start n8n with hot reload
 npm run lint     # ESLint (n8n node rules)
 npm run build    # Compile to dist/
 npm run deploy   # Build + copy to custom n8n folder
-npm run release  # Version bump, changelog, tag, publish
+npm publish --access restricted  # Manual private publish to npm
 ```
 
 Requires Node.js 22+. See [n8n node development](https://docs.n8n.io/integrations/creating-nodes/).
