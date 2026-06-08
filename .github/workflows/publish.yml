@@ -13,6 +13,8 @@ on:
   push:
     tags:
       - '*.*.*'
+  # Manual publish from main (uses the workflow on the selected branch, not an old tag).
+  workflow_dispatch:
 
 jobs:
   publish:
