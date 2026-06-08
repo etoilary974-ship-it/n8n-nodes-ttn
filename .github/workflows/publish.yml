@@ -1,13 +1,10 @@
 # Publishes this n8n community node package to npm on every version tag push.
 #
-# Authentication: npm Trusted Publishing (OIDC) — no NPM_TOKEN required.
-# Do NOT set registry-url on setup-node: it writes an empty _authToken line
-# that blocks OIDC. npm 11+ on Node 24 detects GitHub Actions automatically.
-#
-# Trusted Publisher on npmjs.com:
+# Auth: npm Trusted Publishing (OIDC) — no NPM_TOKEN required.
+# Trusted Publisher on npmjs.com must match exactly:
 #   Owner: etoilary974-ship-it | Repo: n8n-nodes-ttn | Workflow: publish.yml
 #
-# Release locally: npm run release  (bumps version, tags, pushes — no npm publish)
+# Release locally: npm run release  (bumps version, tags, pushes)
 # Tag push triggers this workflow.
 
 name: Publish
@@ -16,9 +13,6 @@ on:
   push:
     tags:
       - '*.*.*'
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   publish:
@@ -30,12 +24,13 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci --ignore-scripts
@@ -46,5 +41,25 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Configure npm registry for OIDC publish
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          scope: '@loewencreville'
+          package-manager-cache: false
+
+      - name: Prepare .npmrc for OIDC
+        run: |
+          # setup-node writes an empty _authToken line that blocks OIDC — remove it.
+          NPMRC_PATH="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+          if [ -f "$NPMRC_PATH" ]; then
+            sed -i '/_authToken/d' "$NPMRC_PATH"
+          fi
+          echo "node $(node --version), npm $(npm --version)"
+          echo "repository: $(node -p "require('./package.json').repository.url")"
+          echo ".npmrc ($NPMRC_PATH):"
+          cat "$NPMRC_PATH" 2>/dev/null || echo "(none)"
+
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: npm publish --access public
