@@ -5,7 +5,7 @@
 # that blocks OIDC. npm 11+ on Node 24 detects GitHub Actions automatically.
 #
 # Trusted Publisher on npmjs.com:
-#   Owner: etoilary974-ship-it | Repo: TTN_Node | Workflow: publish.yml
+#   Owner: etoilary974-ship-it | Repo: n8n-nodes-ttn | Workflow: publish.yml
 #
 # Release locally: npm run release  (bumps version, tags, pushes — no npm publish)
 # Tag push triggers this workflow.

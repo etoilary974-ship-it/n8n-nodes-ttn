@@ -13,14 +13,14 @@
   "publishConfig": {
     "access": "public"
   },
-  "homepage": "https://github.com/etoilary974-ship-it/TTN_Node",
+  "homepage": "https://github.com/etoilary974-ship-it/n8n-nodes-ttn",
   "author": {
     "name": "Loewen Creville",
     "email": "etoilary.974@gmail.com"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/etoilary974-ship-it/TTN_Node.git"
+    "url": "git+https://github.com/etoilary974-ship-it/n8n-nodes-ttn.git"
   },
   "main": "index.js",
   "engines": {

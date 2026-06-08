@@ -31,8 +31,8 @@ Follow the [n8n community nodes installation guide](https://docs.n8n.io/integrat
 For self-hosted n8n with a custom nodes folder (Docker volume, etc.):
 
 ```bash
-git clone https://github.com/etoilary974-ship-it/TTN_Node.git
-cd TTN_Node
+git clone https://github.com/etoilary974-ship-it/n8n-nodes-ttn.git
+cd n8n-nodes-ttn
 npm install
 npm run build
 # Copy dist/ + package.json to your n8n custom nodes directory, then restart n8n.
@@ -234,7 +234,7 @@ npm run release  # Lint, build, version bump, tag — triggers publish.yml on pu
 
 Requires Node.js 22+. See [n8n node development](https://docs.n8n.io/integrations/creating-nodes/).
 
-**Publishing:** configure an [npm Trusted Publisher](https://docs.npmjs.com/trusted-publishers) on the package (owner `etoilary974-ship-it`, repo `TTN_Node`, workflow `publish.yml`), then run `npm run release`. The GitHub Actions workflow publishes to npm with provenance (required for n8n community verification since May 2026).
+**Publishing:** configure an [npm Trusted Publisher](https://docs.npmjs.com/trusted-publishers) on the package (owner `etoilary974-ship-it`, repo `n8n-nodes-ttn`, workflow `publish.yml`), then run `npm run release`. The GitHub Actions workflow publishes to npm with provenance (required for n8n community verification since May 2026).
 
 ## Resources
 
@@ -258,9 +258,9 @@ Requires Node.js 22+. See [n8n node development](https://docs.n8n.io/integration
 ### This project
 
 - [npm package](https://www.npmjs.com/package/@loewencreville/n8n-nodes-ttn)
-- [GitHub repository](https://github.com/etoilary974-ship-it/TTN_Node)
+- [GitHub repository](https://github.com/etoilary974-ship-it/n8n-nodes-ttn)
 - [Changelog](CHANGELOG.md)
-- [Report an issue](https://github.com/etoilary974-ship-it/TTN_Node/issues)
+- [Report an issue](https://github.com/etoilary974-ship-it/n8n-nodes-ttn/issues)
 
 ## Version history
 
