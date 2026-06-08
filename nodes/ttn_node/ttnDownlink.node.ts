@@ -6,7 +6,7 @@ import type {
 	INodeTypeDescription,
 } from 'n8n-workflow';
 import {
-	ttnExecuteDownlinkQueue,
+	ttnExecuteDownlinkPush,
 	ttnEnrichNodeOperationErrorWithTtnContext,
 	ttnExecutionErrorToCleanJson,
 	ttnFormatTtnApiErrorDescription,
@@ -25,7 +25,7 @@ const description: INodeTypeDescription = {
 	subtitle:
 		'={{$parameter["applicationId"] + " · " + $parameter["deviceId"]}}',
 	description:
-		'Legacy: use the **TTN** node → **Devices** → **Send Downlink**. Kept for existing workflows (push / replace / clear queue).',
+		'Legacy: use the **TTN** node → **Devices** → **Send Downlink**. Kept for existing workflows (push only).',
 	defaults: {
 		name: 'TTN: Downlink (legacy)',
 	},
@@ -69,48 +69,12 @@ const description: INodeTypeDescription = {
 			description: 'Target device for the downlink queue (GET …/applications/{ID}/devices). Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 		},
 		{
-			displayName: 'Operation',
-			name: 'operation',
-			type: 'options',
-			noDataExpression: true,
-			options: [
-				{
-					name: 'Enqueue (Push)',
-					value: 'push',
-					description:
-						'Append message to the queue (POST …/down/push)',
-					action: 'Append message to the queue post down push',
-				},
-				{
-					name: 'Replace Queue',
-					value: 'replace',
-					description:
-						'Replace the whole queue with this message (POST …/down/replace)',
-					action: 'Replace the whole queue with this message post down replace',
-				},
-				{
-					name: 'Clear Queue',
-					value: 'clear',
-					description:
-						'Sends downlinks: [] (POST …/down/replace)',
-					action: 'Sends downlinks post down replace',
-				},
-			],
-			default: 'push',
-			description: 'Push, full replace, or empty queue',
-		},
-		{
 			displayName: 'FPort',
 			name: 'fPort',
 			type: 'number',
 			typeOptions: { minValue: 1, maxValue: 223 },
 			default: 1,
 			required: true,
-			displayOptions: {
-				show: {
-					operation: ['push', 'replace'],
-				},
-			},
 			description: 'LoRaWAN application port (1–223)',
 		},
 		{
@@ -118,11 +82,6 @@ const description: INodeTypeDescription = {
 			name: 'payloadFormat',
 			type: 'options',
 			noDataExpression: true,
-			displayOptions: {
-				show: {
-					operation: ['push', 'replace'],
-				},
-			},
 			options: [
 				{
 					name: 'Hex',
@@ -147,11 +106,6 @@ const description: INodeTypeDescription = {
 				rows: 4,
 			},
 			default: '',
-			displayOptions: {
-				show: {
-					operation: ['push', 'replace'],
-				},
-			},
 			description: 'Hex (no 0x) or JSON object depending on payload type',
 		},
 		{
@@ -159,11 +113,6 @@ const description: INodeTypeDescription = {
 			name: 'priority',
 			type: 'options',
 			noDataExpression: true,
-			displayOptions: {
-				show: {
-					operation: ['push', 'replace'],
-				},
-			},
 			options: [
 				{ name: 'HIGH', value: 'HIGH' },
 				{ name: 'HIGHEST', value: 'HIGHEST' },
@@ -179,11 +128,6 @@ const description: INodeTypeDescription = {
 			name: 'confirmed',
 			type: 'boolean',
 			default: false,
-			displayOptions: {
-				show: {
-					operation: ['push', 'replace'],
-				},
-			},
 			description:
 				'Whether the device must acknowledge the downlink (confirmed downlink)',
 		},
@@ -195,11 +139,6 @@ const description: INodeTypeDescription = {
 				rows: 2,
 			},
 			default: '',
-			displayOptions: {
-				show: {
-					operation: ['push', 'replace'],
-				},
-			},
 			description:
 				'Optional: JSON array of strings, e.g. ["n8n","run-1"]',
 		},
@@ -224,17 +163,12 @@ export class TtnDownlink implements INodeType {
 			try {
 				const applicationId = this.getNodeParameter('applicationId', i) as string;
 				const deviceId = this.getNodeParameter('deviceId', i) as string;
-				const operation = this.getNodeParameter('operation', i) as
-					| 'push'
-					| 'replace'
-					| 'clear';
 
-				const json = await ttnExecuteDownlinkQueue(
+				const json = await ttnExecuteDownlinkPush(
 					this,
 					i,
 					applicationId,
 					deviceId,
-					operation,
 				);
 
 				out.push({ json, pairedItem: { item: i } });

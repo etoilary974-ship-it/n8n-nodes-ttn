@@ -7,11 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Data and gateway operations no longer duplicate output when the workflow passes multiple input items (e.g. **List Applications**, **Get Gateway Status**).
+- Gateway **uptime** is computed again when `connected_at` is missing but the gateway is online (fallback to latest activity after `disconnected_at`; supports protobuf timestamps).
+
 ### Changed
 
 - Harmonized legacy node display names: `TTN: Downlink (legacy)`, `TTN: Uplink Trigger (legacy)`.
 - Translated remaining French comments and UI strings to English.
 - Filled documentation URLs in `ttn.node.json`.
+- Downlink handling simplified to **push only** via `ttnExecuteDownlinkPush` (main TTN node and legacy downlink node).
+- Data and gateway operations always run once per execution (only **Devices · Send Downlink** may run per input item).
+
+### Removed
+
+- Send Downlink command preview notice from the main TTN node.
+- `ttnExecuteDownlinkQueue` and **Replace Queue** / **Clear Queue** options from the legacy downlink node.
+- `README_TEMPLATE.md`, unused icons (`TheThingsNetwork-logo-vector`, `github`), `.prettierrc.js`.
+- Legacy `webhookPayloadOutput` branch in `ttnWebhookOutputMapper.ts`.
 
 ## [0.2.0] - 2026-06-07
 
@@ -54,7 +68,7 @@ First release of **n8n-nodes-ttn** — an n8n community node package for [The Th
   - **Get Last Uplink**: Storage stream (`text/event-stream`) with `last` window, application or device scope, configurable output shapes.
   - **List Devices** / **Get Device Info** / **Get Device Status**: list, details, and online/offline status (configurable threshold).
   - **List Applications**: list applications visible to the API key.
-  - **Send Command (Downlink)**: push, replace, or clear the downlink queue.
+  - **Send Command (Downlink)**: push downlink to the device queue.
   - **List Gateways**: list by scope (all, user, organization) with summary or detailed mode and optional location.
   - **Get Gateway Status**: last activity and online/offline status.
   - Dynamic dropdowns for applications, devices, and gateways.
@@ -68,7 +82,7 @@ First release of **n8n-nodes-ttn** — an n8n community node package for [The Th
 
 - **TTN Uplink Trigger** — dedicated uplink webhook variant (kept for existing workflows).
 
-- **TTN: Downlink (deprecated)** — hidden from the node picker, kept for backward compatibility (push / replace / clear queue).
+- **TTN: Downlink (deprecated)** — hidden from the node picker, kept for backward compatibility.
 
 #### Tooling & CI
 

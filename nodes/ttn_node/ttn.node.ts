@@ -7,7 +7,7 @@ import type {
 	INodeTypeDescription,
 } from 'n8n-workflow';
 import {
-	ttnExecuteDownlinkQueue,
+	ttnExecuteDownlinkPush,
 	ttnExecuteGetDeviceStatus,
 	ttnExecuteGetGatewayStatus,
 	ttnExecuteListGateways,
@@ -20,7 +20,6 @@ import {
 	ttnGetApplications,
 	ttnGetDevices,
 	ttnGetGateways,
-	ttnSendCommandPreviewNoticeExpression,
 	TtnApiError,
 	type TtnGatewayListScope,
 } from './ttnShared.js';
@@ -59,6 +58,12 @@ function normalizeResourceOperation(
 		return { resource: 'gateways', operation };
 	}
 	return { resource: resource as TtnResource, operation };
+}
+
+/** Data and gateway ops use node parameters only; Devices · Send Downlink may run per input item. */
+function ttnOperationRunsOnce(resource: string, operation: string): boolean {
+	const norm = normalizeResourceOperation(resource, operation);
+	return norm.resource !== 'devices';
 }
 
 function ttnNormalizeMultiSelectIds(raw: unknown): string[] {
@@ -748,17 +753,6 @@ const ttnDescription: INodeTypeDescription = {
 			},
 			description: 'Device must ACK (confirmed downlink)',
 		},
-		{
-			displayName: ttnSendCommandPreviewNoticeExpression(),
-			name: 'sendCommandPreview',
-			type: 'notice',
-			default: '',
-			displayOptions: {
-				show: {
-					resource: ['devices'],
-				},
-			},
-		},
 	],
 };
 
@@ -779,15 +773,8 @@ export class Ttn implements INodeType {
 		const rawO0 = this.getNodeParameter('operation', 0) as string;
 		const norm0 = normalizeResourceOperation(rawR0, rawO0);
 
-		if (items.length === 0) {
-			if (
-				(norm0.resource === 'gateways' &&
-					(norm0.operation === 'listGateways' || norm0.operation === 'getGatewayStatus')) ||
-				(norm0.resource === 'data' &&
-					(norm0.operation === 'getDeviceStatus' || norm0.operation === 'getLastUplink'))
-			) {
-				items = [{ json: {} }];
-			}
+		if (ttnOperationRunsOnce(norm0.resource, norm0.operation) || items.length === 0) {
+			items = [{ json: {} }];
 		}
 
 		const out: INodeExecutionData[] = [];
@@ -904,12 +891,11 @@ export class Ttn implements INodeType {
 					ttnExecuteResource = 'devices';
 					const applicationId = this.getNodeParameter('applicationId', i) as string;
 					const deviceId = this.getNodeParameter('deviceId', i) as string;
-					json = await ttnExecuteDownlinkQueue(
+					json = await ttnExecuteDownlinkPush(
 						this,
 						i,
 						applicationId,
 						deviceId,
-						'push',
 					);
 				} else if (resource === 'gateways') {
 					ttnExecuteResource = 'gateways';
@@ -1018,7 +1004,7 @@ export class Ttn implements INodeType {
 					...(ttnExecuteResource === 'devices'
 						? {
 								description:
-									'Downlink: the response comes from the Application Server API (POST …/as/…/down/push or …/replace). It may be a 4xx/5xx error while the TTS console still shows the application payload was received.',
+									'Downlink: the response comes from the Application Server API (POST …/as/…/down/push). It may be a 4xx/5xx error while the TTS console still shows the application payload was received.',
 							}
 						: ttnExecuteResource === 'gateways'
 							? {

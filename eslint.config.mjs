@@ -11,7 +11,7 @@ const legacyStructureRules = {
 };
 
 export default tseslint.config(
-	globalIgnores(['dist', 'node_modules', 'scripts/**', '.prettierrc.js']),
+	globalIgnores(['dist', 'node_modules', 'scripts/**']),
 	js.configs.recommended,
 	...tseslint.configs.recommended,
 	{

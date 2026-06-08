@@ -95,7 +95,7 @@ Unified action node with three resources.
 
 | Operation | TTS API | Description |
 |-----------|---------|-------------|
-| **Send Downlink** | `POST …/down/push` | Enqueues a downlink on the device queue. Live **command preview** in the node panel shows the exact JSON sent to TTS. |
+| **Send Downlink** | `POST …/down/push` | Enqueues a downlink on the device queue. |
 
 Downlink parameters match [The Things Stack downlink fields](https://www.thethingsindustries.com/docs/reference/api/application_server/#message-types):
 
@@ -103,8 +103,6 @@ Downlink parameters match [The Things Stack downlink fields](https://www.thethin
 - **Payload type** — Hex (`frm_payload`, base64-encoded by the node) or JSON (`decoded_payload`)
 - **Priority** — `LOWEST` … `HIGHEST`
 - **Confirmed downlink** — requires device ACK
-
-> To **replace** or **clear** the downlink queue, use the legacy **TTN: Downlink (legacy)** node (hidden in the picker, still available in existing workflows).
 
 #### Gateways
 

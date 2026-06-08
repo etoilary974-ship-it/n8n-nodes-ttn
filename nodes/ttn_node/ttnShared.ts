@@ -509,11 +509,75 @@ function ttnPickValidIsoTimestamp(v: unknown): string | undefined {
 	return trimmed;
 }
 
+/** ISO string or protobuf `google.protobuf.Timestamp` (`{ seconds, nanos }`). */
+function ttnNormalizeTimestamp(v: unknown): string | undefined {
+	const direct = ttnPickValidIsoTimestamp(v);
+	if (direct) {
+		return direct;
+	}
+	if (!v || typeof v !== 'object' || Array.isArray(v)) {
+		return undefined;
+	}
+	const record = v as IDataObject;
+	const secondsRaw = record.seconds;
+	if (secondsRaw === undefined || secondsRaw === null) {
+		return undefined;
+	}
+	const seconds =
+		typeof secondsRaw === 'number'
+			? secondsRaw
+			: typeof secondsRaw === 'string'
+				? Number.parseInt(secondsRaw, 10)
+				: Number.NaN;
+	if (!Number.isFinite(seconds) || seconds <= 0) {
+		return undefined;
+	}
+	const nanosRaw = record.nanos;
+	const nanos =
+		typeof nanosRaw === 'number'
+			? nanosRaw
+			: typeof nanosRaw === 'string'
+				? Number.parseInt(nanosRaw, 10)
+				: 0;
+	const ms = seconds * 1000 + (Number.isFinite(nanos) ? Math.floor(nanos / 1_000_000) : 0);
+	const iso = new Date(ms).toISOString();
+	return ttnPickValidIsoTimestamp(iso);
+}
+
+/**
+ * Uptime anchor: `connected_at` when set; otherwise latest activity after `disconnected_at`
+ * (TTS clears `connected_at` on disconnect but keeps stats for 48h).
+ */
+function ttnPickGatewayUptimeAnchor(stats: IDataObject, online: boolean): string | undefined {
+	const connectedAt = ttnNormalizeTimestamp(stats.connected_at);
+	if (connectedAt) {
+		return connectedAt;
+	}
+	if (!online) {
+		return undefined;
+	}
+	const disconnectedAt = ttnNormalizeTimestamp(stats.disconnected_at);
+	const activityTimestamps = [
+		ttnNormalizeTimestamp(stats.last_status_received_at),
+		ttnNormalizeTimestamp(stats.last_uplink_received_at),
+	].filter((t): t is string => !!t);
+	if (activityTimestamps.length === 0) {
+		return undefined;
+	}
+	const latestActivity = activityTimestamps.reduce((latest, cur) =>
+		Date.parse(cur) > Date.parse(latest) ? cur : latest,
+	);
+	if (!disconnectedAt || Date.parse(latestActivity) > Date.parse(disconnectedAt)) {
+		return latestActivity;
+	}
+	return undefined;
+}
+
 /** Most recent activity from Gateway Server connection stats. */
 function ttnPickLastSeenAtFromGatewayConnectionStats(stats: IDataObject): string | undefined {
 	const candidates = [
-		ttnPickValidIsoTimestamp(stats.last_uplink_received_at),
-		ttnPickValidIsoTimestamp(stats.last_status_received_at),
+		ttnNormalizeTimestamp(stats.last_uplink_received_at),
+		ttnNormalizeTimestamp(stats.last_status_received_at),
 	].filter((t): t is string => !!t);
 	if (candidates.length === 0) {
 		return undefined;
@@ -572,28 +636,30 @@ export async function ttnExecuteGetGatewayStatus(
 		offlineAfterMinutes,
 	);
 
+	const online = online_status === 'online';
+	const uptimeAnchor = ttnPickGatewayUptimeAnchor(stats, online);
+
 	if (statusMode === 'onlineOffline') {
-		const connectedAt = ttnPickValidIsoTimestamp(stats.connected_at);
 		return {
 			gateway_id: gatewayId,
-			online: online_status === 'online',
-			uptime: ttnFormatDurationLabel(ttnSecondsSinceIsoTimestamp(connectedAt)),
+			online,
+			uptime: ttnFormatDurationLabel(ttnSecondsSinceIsoTimestamp(uptimeAnchor)),
 		};
 	}
 
 	const sinceLastSeen = ttnFormatSinceLastSeen(seconds_since_last_seen);
-	const connectedAt = ttnPickValidIsoTimestamp(stats.connected_at);
-	const lastUplinkAt = ttnPickValidIsoTimestamp(stats.last_uplink_received_at);
-	const uptime = ttnFormatDurationSinceIso(connectedAt);
+	const connectedAt = ttnNormalizeTimestamp(stats.connected_at);
+	const lastUplinkAt = ttnNormalizeTimestamp(stats.last_uplink_received_at);
+	const uptime = ttnFormatDurationSinceIso(uptimeAnchor);
 	const sinceLastUplink = ttnFormatDurationSinceIso(lastUplinkAt);
 
 	return {
 		gateway_id: gatewayId,
 		last_seen_at: lastSeen ?? null,
 		last_uplink_received_at: lastUplinkAt ?? null,
-		last_status_received_at: ttnPickValidIsoTimestamp(stats.last_status_received_at) ?? null,
+		last_status_received_at: ttnNormalizeTimestamp(stats.last_status_received_at) ?? null,
 		connected_at: connectedAt ?? null,
-		disconnected_at: ttnPickValidIsoTimestamp(stats.disconnected_at) ?? null,
+		disconnected_at: ttnNormalizeTimestamp(stats.disconnected_at) ?? null,
 		uptime: uptime?.duration ?? null,
 		uptime_unit: uptime?.duration_unit ?? null,
 		since_last_uplink: sinceLastUplink?.duration ?? null,
@@ -1322,14 +1388,14 @@ function ttnValidateJsonPayload(trimmed: string): { decoded?: IDataObject; error
 	return { decoded: parsed as IDataObject };
 }
 
-export function ttnBuildSendCommandPreviewData(opts: {
+function ttnBuildDownlinkPayload(opts: {
 	fPort: number;
 	payloadFormat: string;
 	payloadRaw: string;
 	priority: string;
 	confirmed: boolean;
-}): { preview: IDataObject } | { error: string } {
-	const preview: IDataObject = {
+}): { payload: IDataObject } | { error: string } {
+	const payload: IDataObject = {
 		f_port: opts.fPort,
 		priority: opts.priority,
 		confirmed: opts.confirmed,
@@ -1341,8 +1407,8 @@ export function ttnBuildSendCommandPreviewData(opts: {
 		if (hexError) {
 			return { error: hexError };
 		}
-		preview.frm_payload = ttnHexToBase64(compact);
-		return { preview };
+		payload.frm_payload = ttnHexToBase64(compact);
+		return { payload };
 	}
 
 	if (opts.payloadFormat === 'decodedJson') {
@@ -1350,64 +1416,11 @@ export function ttnBuildSendCommandPreviewData(opts: {
 		if (error) {
 			return { error };
 		}
-		preview.decoded_payload = decoded;
-		return { preview };
+		payload.decoded_payload = decoded;
+		return { payload };
 	}
 
 	return { error: 'Payload type must be Hex or JSON (decoded_payload)' };
-}
-
-/** n8n notice expression: live Send Command preview in the node panel. */
-export function ttnSendCommandPreviewNoticeExpression(): string {
-	return `={{ (() => {
-		const preview = {
-			f_port: $parameter.fPort,
-			priority: $parameter.priority,
-			confirmed: !!$parameter.confirmed,
-		};
-		const fmt = $parameter.payloadFormat;
-		const raw = String($parameter.payload ?? '').trim();
-		const hexError = (compact) => {
-			if (!compact) return 'Hex payload: value is required';
-			if (/^0x/i.test(compact)) return 'Hex payload: do not include a 0x prefix (use characters 0-9 and A-F only)';
-			if (compact.length % 2 !== 0) return 'Hex payload: character count must be even';
-			if (!/^[0-9A-F]*$/.test(compact)) {
-				return /[a-f]/.test(compact)
-					? 'Hex payload: use uppercase hex digits only (0-9 and A-F, no lowercase a-f)'
-					: 'Hex payload: only hexadecimal characters 0-9 and A-F are allowed';
-			}
-			return null;
-		};
-		const hexToBase64 = (hex) => {
-			const bytes = hex.match(/.{2}/g).map((pair) => parseInt(pair, 16));
-			let binary = '';
-			for (const byte of bytes) binary += String.fromCharCode(byte);
-			return btoa(binary);
-		};
-		if (fmt === 'hex') {
-			const compact = raw.replace(/\\s/g, '');
-			const err = hexError(compact);
-			if (err) return '**Command preview** — ' + err;
-			preview.frm_payload = hexToBase64(compact);
-		} else if (fmt === 'decodedJson') {
-			if (!raw) {
-				preview.decoded_payload = {};
-			} else {
-				try {
-					const parsed = JSON.parse(raw);
-					if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-						return '**Command preview** — JSON payload: expected a JSON object for decoded_payload';
-					}
-					preview.decoded_payload = parsed;
-				} catch {
-					return '**Command preview** — JSON payload: invalid JSON (expected a JSON object for decoded_payload)';
-				}
-			}
-		} else {
-			return '**Command preview** — Payload type must be Hex or JSON (decoded_payload)';
-		}
-		return '**Command preview**\\n' + JSON.stringify(preview, null, 2);
-	})() }}`;
 }
 
 function ttnApplyDownlinkPayloadToItem(
@@ -1417,7 +1430,7 @@ function ttnApplyDownlinkPayloadToItem(
 	ctx: IExecuteFunctions,
 	itemIndex: number,
 ): void {
-	const shaped = ttnBuildSendCommandPreviewData({
+	const shaped = ttnBuildDownlinkPayload({
 		fPort: item.f_port as number,
 		payloadFormat,
 		payloadRaw,
@@ -1427,15 +1440,15 @@ function ttnApplyDownlinkPayloadToItem(
 	if ('error' in shaped) {
 		throw new NodeOperationError(ctx.getNode(), shaped.error, { itemIndex });
 	}
-	if (shaped.preview.frm_payload !== undefined) {
-		item.frm_payload = shaped.preview.frm_payload;
+	if (shaped.payload.frm_payload !== undefined) {
+		item.frm_payload = shaped.payload.frm_payload;
 	}
-	if (shaped.preview.decoded_payload !== undefined) {
-		item.decoded_payload = shaped.preview.decoded_payload;
+	if (shaped.payload.decoded_payload !== undefined) {
+		item.decoded_payload = shaped.payload.decoded_payload;
 	}
 }
 
-export function ttnBuildDownlinkItem(i: number, ctx: IExecuteFunctions): IDataObject {
+function ttnBuildDownlinkItem(i: number, ctx: IExecuteFunctions): IDataObject {
 	const fPort = ctx.getNodeParameter('fPort', i) as number;
 	const payloadFormat = ctx.getNodeParameter('payloadFormat', i) as string;
 	const payloadRaw = ctx.getNodeParameter('payload', i) as string;
@@ -1477,50 +1490,40 @@ export function ttnBuildDownlinkItem(i: number, ctx: IExecuteFunctions): IDataOb
 	return item;
 }
 
-/** push — Application Server downlink API (`down/push` returns an empty body on success). */
-export async function ttnExecuteDownlinkQueue(
+async function ttnFetchDownlinkQueueState(
+	ctx: IExecuteFunctions,
+	basePath: string,
+): Promise<IDataObject[]> {
+	try {
+		const queue = await ttnExecuteJsonGet(ctx, basePath);
+		return Array.isArray(queue?.downlinks) ? (queue.downlinks as IDataObject[]) : [];
+	} catch {
+		return [];
+	}
+}
+
+/** Push a single downlink (`POST …/down/push`). Used by TTN and legacy downlink nodes. */
+export async function ttnExecuteDownlinkPush(
 	ctx: IExecuteFunctions,
 	i: number,
 	applicationId: string,
 	deviceId: string,
-	queueOp: 'push' | 'replace' | 'clear' = 'push',
 ): Promise<IDataObject> {
 	const basePath = `/api/v3/as/applications/${encodeURIComponent(applicationId)}/devices/${encodeURIComponent(deviceId)}/down`;
+	const downlink = ttnBuildDownlinkItem(i, ctx);
 
-	let body: IDataObject;
-	let downlink: IDataObject | undefined;
-	if (queueOp === 'clear') {
-		body = { downlinks: [] };
-	} else {
-		downlink = ttnBuildDownlinkItem(i, ctx);
-		body = { downlinks: [downlink] };
-	}
+	await ttnExecuteJsonPost(ctx, `${basePath}/push`, { downlinks: [downlink] });
 
-	const suffix = queueOp === 'clear' || queueOp === 'replace' ? 'replace' : 'push';
-	await ttnExecuteJsonPost(ctx, `${basePath}/${suffix}`, body);
+	const queueDownlinks = await ttnFetchDownlinkQueueState(ctx, basePath);
 
-	let queue: IDataObject | undefined;
-	try {
-		queue = await ttnExecuteJsonGet(ctx, basePath);
-	} catch {
-		queue = undefined;
-	}
-
-	const queueDownlinks = Array.isArray(queue?.downlinks)
-		? (queue.downlinks as IDataObject[])
-		: [];
-
-	const out: IDataObject = {
+	return {
 		success: true,
 		application_id: applicationId,
 		device_id: deviceId,
-		operation: queueOp,
+		operation: 'push',
 		queue_count: queueDownlinks.length,
 		queue_downlinks: queueDownlinks,
+		downlink,
 		source: 'application_server',
 	};
-	if (downlink) {
-		out.downlink = downlink;
-	}
-	return out;
 }

@@ -1,5 +1,4 @@
 import type { IDataObject, IWebhookFunctions } from 'n8n-workflow';
-import { ttnShapeApplicationUplinkOutput } from './ttnShared.js';
 
 /** Root event keys (order = first match wins). */
 const ROOT_EVENT_KEYS = [
@@ -471,48 +470,16 @@ function mapServiceData(root: IDataObject, format: string): IDataObject {
 	return out;
 }
 
-function applyLegacyWebhookPayload(
-	root: IDataObject,
-	legacyMode: string,
-): IDataObject {
-	if (legacyMode === 'full') {
-		return buildFullEventOutput(root);
-	}
-	const headers = root._webhookHeaders;
-	const query = root._webhookQuery;
-	const tag = root._ttnEvent;
-	const shaped = ttnShapeApplicationUplinkOutput(
-		root,
-		legacyMode as 'decodedOnly' | 'decodedWithMeta' | 'full',
-	);
-	const merged: IDataObject = { ...shaped, _webhookHeaders: headers, _webhookQuery: query };
-	if (tag !== undefined) {
-		merged._ttnEvent = tag;
-	}
-	return merged;
-}
-
 /**
  * Apply the output shape from **Event type** and related formats.
  * @returns `null` if the body does not match the selected type and skip is enabled:
  * n8n does not run the workflow (`workflowData: undefined`).
  */
 export function applyTtnWebhookOutputShape(ctx: IWebhookFunctions, json: IDataObject): IDataObject | null {
-	const params = ctx.getNode().parameters as IDataObject;
-	const hasNew = Object.prototype.hasOwnProperty.call(params, 'ttnOutputEventType');
-	const legacyMode = params.webhookPayloadOutput as string | undefined;
-
-	if (!hasNew && legacyMode !== undefined) {
-		return applyLegacyWebhookPayload(json, legacyMode);
-	}
-
 	let outputEventType: string;
 	try {
 		outputEventType = ctx.getNodeParameter('ttnOutputEventType', 0) as string;
 	} catch {
-		if (legacyMode !== undefined) {
-			return applyLegacyWebhookPayload(json, legacyMode);
-		}
 		outputEventType = 'uplink_message';
 	}
 
