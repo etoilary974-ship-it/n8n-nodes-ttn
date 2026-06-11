@@ -132,12 +132,12 @@ const ttnDescription: INodeTypeDescription = {
 						'Storage (Get Last Uplink), device list, device details, online/offline status, applications',
 				},
 				{
-					name: 'Devices',
+					name: 'Device',
 					value: 'devices',
 					description: 'Send downlink commands (POST …/down/push)',
 				},
 				{
-					name: 'Gateways',
+					name: 'Gateway',
 					value: 'gateways',
 					description:
 						'List gateways (API); get gateway online/offline status (Gateway Server connection stats)',
@@ -444,7 +444,7 @@ const ttnDescription: INodeTypeDescription = {
 			description: 'Application-wide or single device',
 		},
 		{
-			displayName: '`Last` Window (Same as TTN Console)',
+			displayName: 'Last Window (Same as TTN Console)',
 			name: 'storageLast',
 			type: 'options',
 			noDataExpression: true,

@@ -22,7 +22,7 @@ export class TtnApi implements ICredentialType {
 			default: '',
 		},
 		{
-			displayName: 'API key (Application Server)',
+			displayName: 'API Key (Application Server)',
 			name: 'apiKey',
 			type: 'string',
 			typeOptions: { password: true },

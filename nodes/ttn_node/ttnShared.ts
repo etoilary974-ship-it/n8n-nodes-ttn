@@ -1441,7 +1441,7 @@ async function ttnFetchDownlinkQueueState(
 	}
 }
 
-/** Push a single downlink (`POST …/down/push`). Used by TTN and legacy downlink nodes. */
+/** Push a single downlink (`POST …/down/push`). Used by TTN → Devices → Send Downlink. */
 export async function ttnExecuteDownlinkPush(
 	ctx: IExecuteFunctions,
 	i: number,

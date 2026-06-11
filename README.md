@@ -146,8 +146,6 @@ Full guide: [TTS Webhooks integration](https://www.thethingsindustries.com/docs/
 
 Credentials are optional on the trigger (only needed for the application/device filter dropdowns).
 
-> **Legacy nodes:** `TTN: Uplink Trigger (legacy)` and `TTN: Downlink (legacy)` remain installed for backward compatibility but are hidden from the picker. New workflows should use **TTN** and **TTN Trigger**.
-
 ## Usage examples
 
 ### Real-time sensor data (webhook)

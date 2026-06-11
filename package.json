@@ -1,6 +1,6 @@
 {
   "name": "@loewencreville/n8n-nodes-ttn",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "description": "n8n community node for The Things Network (TTN)",
   "keywords": [
     "n8n-community-node-package",
@@ -46,9 +46,7 @@
     ],
     "nodes": [
       "dist/nodes/ttn_node/ttn.node.js",
-      "dist/nodes/ttn_node/ttnTrigger.node.js",
-      "dist/nodes/ttn_node/ttnDownlink.node.js",
-      "dist/nodes/ttn_node/ttnUplinkTrigger.node.js"
+      "dist/nodes/ttn_node/ttnTrigger.node.js"
     ]
   },
   "devDependencies": {
